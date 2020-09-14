@@ -1,4 +1,4 @@
-from TemporalNetworkAccessibility.src.AdjacencyMatrixSequence_changed import AdjMatrixSequence
+from src.AdjacencyMatrixSequence import AdjMatrixSequence
 import numpy as np 
 from mpi4py import MPI
 

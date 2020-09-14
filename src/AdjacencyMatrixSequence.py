@@ -1007,6 +1007,7 @@ class AdjMatrixSequence(list):
 
         return np.array(cumu)
 
+# I CHANGED SOMETHING HERE (time dependency of sentinels)
     def unfold_accessibility_with_sentinels(self, sentinels,
                                             start_node=None,
                                             start_time=0,
@@ -1022,7 +1023,7 @@ class AdjMatrixSequence(list):
         Parameters
         ----------
         sentinels : list
-            list of sentinel nodes.
+            list of sentinel nodes. I CHANGED THIS TO BE A DICTIONARY
         start_node : int, optional
             index node of the epidemic. The default is None. If default is used
             staring node is chosen at random.
@@ -1039,8 +1040,8 @@ class AdjMatrixSequence(list):
 
         """
         # raise error if sentinel node not in network
-        if max(sentinels) >= self.number_of_nodes:
-            raise ValueError("Sentinel node not in network.")
+        #if max(sentinels) >= self.number_of_nodes:
+            #raise ValueError("Sentinel node not in network.")
 
         # set start_node for epidemic
         if start_node or start_node is 0:
@@ -1054,11 +1055,13 @@ class AdjMatrixSequence(list):
                           shape=(1, self.number_of_nodes), dtype=int)
 
         # sentinels array
-        row = np.zeros(len(sentinels))
-        col = np.array(sentinels)
-        data = np.ones(len(sentinels))
-        sen_nodes = sp.csr_matrix((data, (row, col)),
-                                  shape=(1, self.number_of_nodes), dtype=int)
+        sen_nodes = {}
+        for time in sentinels:
+            row = np.zeros(len(sentinels[time]))
+            col = np.array(sentinels[time])
+            data = np.ones(len(sentinels[time]))
+            sen_nodes[time] = sp.csr_matrix((data, (row, col)),
+                                    shape=(1, self.number_of_nodes), dtype=int)
 
         # sentinel arrival time dict
         arrival_times = dict()
@@ -1066,20 +1069,22 @@ class AdjMatrixSequence(list):
         if stop_at_detection:
             for t in range(start_time, len(self)):
                 x = x + x * self[t]
-                if (x.multiply(sen_nodes)).nnz > 0:
-                    infected_sentinels = set((x.multiply(sen_nodes) != 0)
-                                             .nonzero()[1])
-                    arrival_times.update({node: (t, x.nnz) for node in
-                                          infected_sentinels})
-                    break
+                if t in sentinels:
+                    if (x.multiply(sen_nodes[time])).nnz > 0:
+                        infected_sentinels = set((x.multiply(sen_nodes[time]) != 0)
+                                                .nonzero()[1])
+                        arrival_times.update({node: (t, x.nnz) for node in
+                                            infected_sentinels})
+                        break
         else:
             for t in range(start_time, len(self)):
                 x = x + x * self[t]
-                infected_sentinels = set((x.multiply(sen_nodes) != 0)
-                                         .nonzero()[1])
-                new_infected = infected_sentinels - arrival_times.keys()
-                arrival_times.update({node: (t, x.nnz) for node in
-                                      new_infected})
+                if t in sentinels:    
+                    infected_sentinels = set((x.multiply(sen_nodes[time]) != 0)
+                                            .nonzero()[1])
+                    new_infected = infected_sentinels - arrival_times.keys()
+                    arrival_times.update({node: (t, x.nnz) for node in
+                                        new_infected})
 
         return arrival_times
 
