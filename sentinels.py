@@ -1,3 +1,4 @@
+import time
 from src.AdjacencyMatrixSequence import AdjMatrixSequence
 import numpy as np 
 from mpi4py import MPI
@@ -11,6 +12,7 @@ rank = comm.Get_rank()
 n_tasks = comm.Get_size()
 
 if rank == 0:
+    start_time=time.time()
     AMS = AdjMatrixSequence(file_path, directed= True, write_label_file=True)#create Adjecency Matrix Object
     sentinels_old_index = np.genfromtxt(sentinel_path, dtype = int, delimiter = ",")
     sentinels_old_index = sentinels_old_index.tolist()
@@ -26,9 +28,9 @@ else:
     sentinels_dic = None
     nodes = None
 
-#AMS = comm.bcast(AMS)
-#sentinels_dic = comm.bcast(sentinels_dic)
-#nodes = comm.scatter(nodes)
+AMS = comm.bcast(AMS)
+sentinels_dic = comm.bcast(sentinels_dic)
+nodes = comm.bcast(nodes)
 starts = nodes.tolist()
 
 print("starting")
@@ -39,5 +41,6 @@ for start in starts:
     si_model.dilute()
     result = si_model.unfold_accessibility_with_sentinels(sentinels_dic, start)
     results.append(result)
-    print(result)
+
+if rank == 0: print(time.time()-start_time)
 
