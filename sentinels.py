@@ -3,39 +3,36 @@ from src.AdjacencyMatrixSequence import AdjMatrixSequence
 import numpy as np 
 from mpi4py import MPI
 from tools import format_results, read_sentinels
+import random as rn
+import pandas as pd 
 
-file_path = "syndata1/syndata1right_format.txt"
-sentinel_path = "syndata1/degreebs_sentil.txt"
 p_si = 0.9
+p_false_positive = 0.1
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 n_tasks = comm.Get_size()
 
-if rank == 0:
-    start_time=time.time()
-    AMS = AdjMatrixSequence(file_path, directed= True, write_label_file=True)#create Adjecency Matrix Object
-    sentinels= read_sentinels(sentinel_path)
-    nodes = np.arange(AMS.number_of_nodes)
-else:
-    AMS = None
-    sentinels = None
-    nodes = None
+#file_path = "syndata"+str(rank)+"/dataset.txt"
+#sentinel_path = "syndata"+str(rank)+"/betw_sentil.txt"
+file_path = "syndata1/syndata1.txt"
+sentinel_path = "syndata1/degreebs_sentil.txt"
+#df = pd.read_csv(file_path, delimiter=",", names=["source", "target", "day", "weight"])
+#df.to_csv(file_path, sep = "\t", header=False, index = False)
 
-AMS = comm.bcast(AMS)
-sentinels = comm.bcast(sentinels)
-nodes = comm.bcast(nodes)
-starts = nodes.tolist()
-
-print("starting")
+start_time=time.time()
+AMS = AdjMatrixSequence(file_path, directed= True, write_label_file=True)#create Adjecency Matrix Object
+sentinels= read_sentinels(sentinel_path)
+nodes = range(AMS.number_of_nodes)
+starts = rn.sample(nodes, 10)
 
 results = []
 for start in starts:
     si_model = AMS.copy()
     si_model.dilute(p_si)
-    result = si_model.unfold_accessibility_with_sentinels(sentinels, start)
+    result = si_model.unfold_accessibility_with_sentinels(sentinels, start, stop_at_detection = True, p_false_positive=p_false_positive)
     results.append(result)
 
-if rank == 0: format_results(results)
+format_results(results, "results/results_degreebs_sentil_"+str(rank)+".txt")
 
-if rank == 0: print(time.time()-start_time)
+print(time.time()-start_time)

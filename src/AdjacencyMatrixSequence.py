@@ -1011,7 +1011,7 @@ class AdjMatrixSequence(list):
     def unfold_accessibility_with_sentinels(self, sentinels,
                                             start_node=None,
                                             start_time=0,
-                                            stop_at_detection=False):
+                                            stop_at_detection=False, p_false_positive = 0.5):
         """
         Unfold the accessibility graph including sentinel nodes.
 
@@ -1048,7 +1048,7 @@ class AdjMatrixSequence(list):
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
-        print("Starting epidemic at node ", start)
+        #print("Starting epidemic at node ", start)
 
         # state array
         x = sp.csr_matrix(([1], ([0], [start])),
@@ -1073,9 +1073,11 @@ class AdjMatrixSequence(list):
                     if (x.multiply(sen_nodes[time])).nnz > 0:
                         infected_sentinels = set((x.multiply(sen_nodes[time]) != 0)
                                                 .nonzero()[1])
+                        positive_tests = {s for s in infected_sentinels if random.random() < p_false_positive}
                         arrival_times.update({node: (t, x.nnz) for node in
-                                            infected_sentinels})
-                        break
+                                            positive_tests})
+                        if positive_tests: 
+                            break
         else:
             for t in range(start_time, len(self)):
                 x = x + x * self[t]
@@ -1087,6 +1089,86 @@ class AdjMatrixSequence(list):
                                         new_infected})
 
         return arrival_times
+    
+    def unfold_accessibility_with_sentinels_strategic(self, sentinels,
+                                            start_node=None,
+                                            start_time=0,
+                                            stop_at_detection=False, interval=7, chunksize=1):
+        """
+        Unfold the accessibility graph including sentinel nodes.
+
+        Sentinel nodes are for disease detection. The method returns the
+        arrival times of an epidemic at the *sentinels* starting at
+        *start_node*. In order to simulate SI-like spreading the network
+        should be diluted.
+
+        Parameters
+        ----------
+        sentinels : list
+            list of sentinel nodes.
+        start_node : int, optional
+            index node of the epidemic. The default is None. If default is used
+            staring node is chosen at random.
+        start_time : int, optional
+            starting time for the epidemic. The default is 0.
+        stop_at_detection : Boolean, optional
+            If true, the epidemic is stopped, when it arrives at any sentonel
+            node. The default is False.
+
+        Returns
+        -------
+        Dictionary. Keys are sentinel nodes and values are tuples with
+        (arrival time, outbreak size).
+
+        """
+        # raise error if sentinel node not in network
+        #if max(sentinels) >= self.number_of_nodes:
+            #raise ValueError("Sentinel node not in network.")
+
+        # set start_node for epidemic
+        if start_node or start_node is 0:
+            start = start_node
+        else:
+            start = np.random.randint(self.number_of_nodes)
+        #print("Starting epidemic at node ", start)
+
+        # state array
+        x = sp.csr_matrix(([1], ([0], [start])),
+                          shape=(1, self.number_of_nodes), dtype=int)
+
+        # sentinels array
+        row = np.zeros(len(sentinels))
+        col = np.array(sentinels)
+        data = np.ones(len(sentinels))
+        sen_nodes = sp.csr_matrix((data, (row, col)),
+                                shape=(1, self.number_of_nodes), dtype=int)
+
+        # sentinel arrival time dict
+        arrival_times = dict()
+
+        if stop_at_detection:
+            for t in range(start_time, len(self)):
+                x = x + x * self[t]
+                if t%interval==0:
+                    sen_nodes_subset = self.random_submatrix(sen_nodes, p=chunksize)
+                    if (x.multiply(sen_nodes_subset)).nnz > 0:
+                        infected_sentinels = set((x.multiply(sen_nodes_subset) != 0)
+                                                .nonzero()[1])
+                        arrival_times.update({node: (t, x.nnz) for node in
+                                            infected_sentinels})
+                        break
+        else:
+            for t in range(start_time, len(self)):
+                x = x + x * self[t]
+                if t%interval==0:    
+                    infected_sentinels = set((x.multiply(self.random_submatrix(sen_nodes, p=chunksize)) != 0)
+                                            .nonzero()[1])
+                    new_infected = infected_sentinels - arrival_times.keys()
+                    arrival_times.update({node: (t, x.nnz) for node in
+                                        new_infected})
+
+        return arrival_times
+
 
     def trace_forward(self, start_node, start_time=0, stop=None):
         """

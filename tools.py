@@ -8,19 +8,17 @@ def read_sentinels(sentinel_path):
     old_to_new_file = old_to_new_file.tolist()
     old_to_new = {old : new for old, new in old_to_new_file}
     sentinels = [old_to_new[sentinel] for sentinel in sentinels_old_index if sentinel in old_to_new]
-    sentinels_dic = {i*365 : sentinels for i in range(1, 4)}
+    sentinels_dic = {i*7 : sentinels for i in range(1, 4)}
     return(sentinels_dic)
 
-def format_results(results):
+def format_results(results, filename):
     old_to_new_file = np.genfromtxt("oldindex_matrixfriendly.txt", delimiter="\t")
     old_to_new_file = old_to_new_file.tolist()
     new_to_old = {new : old for old, new in old_to_new_file}
     results_ls = []
     for dic in results:
-        ls = [[new_to_old[sent], dic[sent][0], dic[sent][1]] for sent in dic]
+        ls = [dic.items()[0][1][0], dic.items()[0][1][1]]#!!!!! nur eine zeile pro simulation.
         results_ls = results_ls + ls
-    df = pd.DataFrame(results_ls, columns = ["sent", "day", "n_infected"])
-    result_by_sent = { i : j.drop("sent", axis = 1).to_numpy().tolist() for i, j in df.groupby("sent") }
-    df = df.sort_values("sent", axis=0)
-    df.to_csv("results.txt", index=False)
-    return(result_by_sent)
+    df = pd.DataFrame(results_ls, columns = ["day", "n_infected"], dtype=int)
+    df.to_csv(filename, index=False)
+    return(df)
