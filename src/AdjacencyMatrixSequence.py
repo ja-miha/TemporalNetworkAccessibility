@@ -40,7 +40,7 @@ class AdjMatrixSequence(list):
     """
 
     def __init__(self, edgelist_fname, directed, write_label_file=False,
-                 columns=(0, 1, 2), firsttime=None, lasttime=None):
+                 columns=(0, 1, 2), firsttime=None, lasttime=None, mpi_rank=0):
         list.__init__(self)
         self.first_day = firsttime
         self.last_day = lasttime
@@ -48,6 +48,7 @@ class AdjMatrixSequence(list):
         self.cols = columns
         self.label_file = write_label_file
         self.is_directed = directed
+        self.mpi_rank = mpi_rank
 
         self.create_matrices()
         if not self.is_directed:
@@ -842,7 +843,7 @@ class AdjMatrixSequence(list):
         # get dictionary of new indices and write map-file
         re_dct = self.reindex(edges)
         if self.label_file:
-            g = open('oldindex_matrixfriendly.txt', 'w+')
+            g = open('oldindex_matrixfriendly'+str(self.mpi_rank)+'.txt', 'w+')
             for k in re_dct:
                 g.writelines((str(k) + '\t' + str(re_dct[k]) + '\n'))
             g.close()
@@ -1011,7 +1012,7 @@ class AdjMatrixSequence(list):
     def unfold_accessibility_with_sentinels(self, sentinels,
                                             start_node=None,
                                             start_time=0,
-                                            stop_at_detection=False, p_false_positive = 0.5):
+                                            stop_at_detection=False, p_false_negative = 0.5):
         """
         Unfold the accessibility graph including sentinel nodes.
 
@@ -1073,11 +1074,13 @@ class AdjMatrixSequence(list):
                     if (x.multiply(sen_nodes[time])).nnz > 0:
                         infected_sentinels = set((x.multiply(sen_nodes[time]) != 0)
                                                 .nonzero()[1])
-                        positive_tests = {s for s in infected_sentinels if random.random() < p_false_positive}
-                        arrival_times.update({node: (t, x.nnz) for node in
+                        positive_tests = {s for s in infected_sentinels if random.random() < p_false_negative}
+                        arrival_times.update({node: (t-start_time, x.nnz) for node in
                                             positive_tests})
                         if positive_tests: 
                             break
+            if not arrival_times:
+                arrival_times.update({"not detected": ("not detected", x.nnz)})
         else:
             for t in range(start_time, len(self)):
                 x = x + x * self[t]
