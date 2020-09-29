@@ -1055,14 +1055,6 @@ class AdjMatrixSequence(list):
         x = sp.csr_matrix(([1], ([0], [start])),
                           shape=(1, self.number_of_nodes), dtype=int)
 
-        # sentinels array
-        sen_nodes = {}
-        for time in sentinels:
-            row = np.zeros(len(sentinels[time]))
-            col = np.array(sentinels[time])
-            data = np.ones(len(sentinels[time]))
-            sen_nodes[time] = sp.csr_matrix((data, (row, col)),
-                                    shape=(1, self.number_of_nodes), dtype=int)
 
         # sentinel arrival time dict
         arrival_times = dict()
@@ -1071,21 +1063,33 @@ class AdjMatrixSequence(list):
             for t in range(start_time, len(self)):
                 x = x + x * self[t]
                 if t in sentinels:
-                    if (x.multiply(sen_nodes[time])).nnz > 0:
-                        infected_sentinels = set((x.multiply(sen_nodes[time]) != 0)
+                    # sentinels array
+                    row = np.zeros(len(sentinels[t]))
+                    col = np.array(sentinels[t])
+                    data = np.ones(len(sentinels[t]))
+                    sen_nodes = sp.csr_matrix((data, (row, col)),
+                                            shape=(1, self.number_of_nodes), dtype=int)
+                    if (x.multiply(sen_nodes)).nnz > 0:
+                        infected_sentinels = set((x.multiply(sen_nodes) != 0)
                                                 .nonzero()[1])
-                        positive_tests = {s for s in infected_sentinels if random.random() < p_false_negative}
-                        arrival_times.update({node: (t-start_time, x.nnz) for node in
+                        positive_tests = {s for s in infected_sentinels if random.random() > p_false_negative}
+                        arrival_times.update({node: (start_time, t, x.nnz) for node in
                                             positive_tests})
                         if positive_tests: 
                             break
             if not arrival_times:
-                arrival_times.update({"not detected": ("not detected", x.nnz)})
+                arrival_times.update({"not detected": (start_time, "not detected", x.nnz)})
         else:
             for t in range(start_time, len(self)):
                 x = x + x * self[t]
                 if t in sentinels:    
-                    infected_sentinels = set((x.multiply(sen_nodes[time]) != 0)
+                    # sentinels array
+                    row = np.zeros(len(sentinels[t]))
+                    col = np.array(sentinels[t])
+                    data = np.ones(len(sentinels[t]))
+                    sen_nodes = sp.csr_matrix((data, (row, col)),
+                                            shape=(1, self.number_of_nodes), dtype=int)
+                    infected_sentinels = set((x.multiply(sen_nodes) != 0)
                                             .nonzero()[1])
                     new_infected = infected_sentinels - arrival_times.keys()
                     arrival_times.update({node: (t, x.nnz) for node in
