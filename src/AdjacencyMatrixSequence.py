@@ -1146,6 +1146,58 @@ class AdjMatrixSequence(list):
 
         return (start_time, "not detected", x.nnz)
     
+    def make_sir_model(self, p_ir, start_node=None, start_time=0):
+        """
+        unfolds accessibility while remembering the infection time for each node, then draws the recovery time 
+        from an exponential distribution and removes the node from the network for all later times
+
+        Parameters
+        ----------
+        p_ir : float
+            recovery rate
+        start_node : int
+            place of first infection
+
+        Returns
+        -------
+        None.
+
+        """
+
+        # set start_node for epidemic
+        if start_node or start_node is 0:
+            start = start_node
+        else:
+            start = np.random.randint(self.number_of_nodes)
+        #print("Starting epidemic at node ", start)
+
+        # state array
+        x = sp.csr_matrix(([1], ([0], [start])),
+                          shape=(1, self.number_of_nodes), dtype=int)
+
+        arrival_times = dict()
+        for t in range(start_time, len(self)):
+            new = x * self[t]
+            new_infected = set((new != 0).nonzero()[1])
+            for node in new_infected:
+                arrival_times[node] = t
+            x = x + new
+        recovery_times = dict()
+        for node in arrival_times:
+            recovery_time = arrival_times[node] + int(random.expovariate(p_ir))
+            if recovery_time < len(self):
+                recovery_times[node] = recovery_time
+        
+        for node in recovery_times:
+            for t in range(recovery_times[node], len(self)):
+                #set row to zero
+                self[t].data[self[t].indptr[node]:self[t].indptr[node+1]] = 0
+                #set column to zero
+                self[t].data[self[t].indices == node] = 0
+        for t in range(len(self)):
+            self[t].eliminate_zeros()
+
+
     def unfold_accessibility_with_sentinels_strategic(self, sentinels,
                                             start_node=None,
                                             start_time=0,

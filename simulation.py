@@ -15,7 +15,7 @@ rank = comm.Get_rank()
 n_tasks = comm.Get_size()
 
 file_path = "Synset/syndata"+str(rank)+"/dataset.txt"
-sen_filename = "betw_sentil"
+sen_filename = "degree_sentil"
 sentinel_path = "Synset/syndata"+str(rank)+"/"+sen_filename+".txt"
 timepoints_path = "Synset/timepoint.txt"
 #file_path = "syndata1/syndata1.txt"
@@ -25,15 +25,15 @@ timepoints_path = "Synset/timepoint.txt"
 
 start_time=time.time()
 AMS = AdjMatrixSequence(file_path, directed= True, write_label_file=True, mpi_rank=rank)#create Adjecency Matrix Object
-tests = read_tests_timepoints(sentinel_path, timepoints_path, mpi_rank=rank)
+tests = read_tests_interval(sentinel_path, mpi_rank=rank)
 nodes = range(AMS.number_of_nodes)
-starts = rn.sample(nodes, 1000)
+starts = rn.sample(nodes, 10)
 
 results = []
 for start in starts:
     inf_time = rn.choice(range(365))
     si_model = AMS.copy()
-    si_model.dilute(p_si)
+    si_model.dilute(p_si) 
     result = si_model.unfold_accessibility_with_tests(tests, start, start_time=inf_time, p_false_negative=p_false_neg)
     results.append(result)
 
