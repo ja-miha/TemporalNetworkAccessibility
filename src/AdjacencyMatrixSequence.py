@@ -1007,24 +1007,21 @@ class AdjMatrixSequence(list):
             cumu.append(x.nnz)
 
         return np.array(cumu)
-
-# I CHANGED SOMETHING HERE (time dependency of sentinels)
+    
     def unfold_accessibility_with_sentinels(self, sentinels,
                                             start_node=None,
                                             start_time=0,
-                                            stop_at_detection=False, p_false_negative = 0.5):
+                                            stop_at_detection=False):
         """
         Unfold the accessibility graph including sentinel nodes.
-
         Sentinel nodes are for disease detection. The method returns the
         arrival times of an epidemic at the *sentinels* starting at
         *start_node*. In order to simulate SI-like spreading the network
         should be diluted.
-
         Parameters
         ----------
         sentinels : list
-            list of sentinel nodes. I CHANGED THIS TO BE A DICTIONARY
+            list of sentinel nodes.
         start_node : int, optional
             index node of the epidemic. The default is None. If default is used
             staring node is chosen at random.
@@ -1033,11 +1030,86 @@ class AdjMatrixSequence(list):
         stop_at_detection : Boolean, optional
             If true, the epidemic is stopped, when it arrives at any sentonel
             node. The default is False.
-
         Returns
         -------
         Dictionary. Keys are sentinel nodes and values are tuples with
         (arrival time, outbreak size).
+        """
+        # raise error if sentinel node not in network
+        if max(sentinels) >= self.number_of_nodes:
+            raise ValueError("Sentinel node not in network.")
+
+        # set start_node for epidemic
+        if start_node or start_node is 0:
+            start = start_node
+        else:
+            start = np.random.randint(self.number_of_nodes)
+        print("Starting epidemic at node ", start)
+
+        # state array
+        x = sp.csr_matrix(([1], ([0], [start])),
+                          shape=(1, self.number_of_nodes), dtype=int)
+
+        # sentinels array
+        row = np.zeros(len(sentinels))
+        col = np.array(sentinels)
+        data = np.ones(len(sentinels))
+        sen_nodes = sp.csr_matrix((data, (row, col)),
+                                  shape=(1, self.number_of_nodes), dtype=int)
+
+        # sentinel arrival time dict
+        arrival_times = dict()
+
+        if stop_at_detection:
+            for t in range(start_time, len(self)):
+                x = x + x * self[t]
+                if (x.multiply(sen_nodes)).nnz > 0:
+                    infected_sentinels = set((x.multiply(sen_nodes) != 0)
+                                             .nonzero()[1])
+                    arrival_times.update({node: (t, x.nnz) for node in
+                                          infected_sentinels})
+                    break
+        else:
+            for t in range(start_time, len(self)):
+                x = x + x * self[t]
+                infected_sentinels = set((x.multiply(sen_nodes) != 0)
+                                         .nonzero()[1])
+                new_infected = infected_sentinels - arrival_times.keys()
+                arrival_times.update({node: (t, x.nnz) for node in
+                                      new_infected})
+
+        return arrival_times
+
+
+    def unfold_accessibility_with_tests(self, tests,
+                                            start_node=None,
+                                            start_time=0,
+                                            stop_at_detection=True, p_false_negative = 0.5):
+        """
+        Unfold the accessibility graph including tests.
+
+        The simulation stops, as soon as there is a positive test (or the end of time is reached). In order to simulate SI-like spreading the network
+        should be diluted.
+
+        Parameters
+        ----------
+        tests : dictionary
+            {time : [tested nodes]}, tested nodes should be reindexed
+        start_node : int, optional
+            index node of the epidemic. The default is None. If default is used
+            staring node is chosen at random.
+        start_time : int, optional
+            starting time for the epidemic. The default is 0.
+        stop_at_detection : Boolean, optional
+            If true, the epidemic is stopped, when it arrives at any sentonel
+            node. The default is False.
+        p_false_negative : float, optional
+            probability of a false positive test. The default is 0.5.
+
+        Returns
+        -------
+        tupel with (start_time, arrival_time, infected premises).
+        arrival time can be "not detected" if there is no positive test.
 
         """
         # raise error if sentinel node not in network
@@ -1056,46 +1128,23 @@ class AdjMatrixSequence(list):
                           shape=(1, self.number_of_nodes), dtype=int)
 
 
-        # sentinel arrival time dict
-        arrival_times = dict()
-
-        if stop_at_detection:
-            for t in range(start_time, len(self)):
-                x = x + x * self[t]
-                if t in sentinels:
-                    # sentinels array
-                    row = np.zeros(len(sentinels[t]))
-                    col = np.array(sentinels[t])
-                    data = np.ones(len(sentinels[t]))
-                    sen_nodes = sp.csr_matrix((data, (row, col)),
-                                            shape=(1, self.number_of_nodes), dtype=int)
-                    if (x.multiply(sen_nodes)).nnz > 0:
-                        infected_sentinels = set((x.multiply(sen_nodes) != 0)
-                                                .nonzero()[1])
-                        positive_tests = {s for s in infected_sentinels if random.random() > p_false_negative}
-                        arrival_times.update({node: (start_time, t, x.nnz) for node in
-                                            positive_tests})
-                        if positive_tests: 
-                            break
-            if not arrival_times:
-                arrival_times.update({"not detected": (start_time, "not detected", x.nnz)})
-        else:
-            for t in range(start_time, len(self)):
-                x = x + x * self[t]
-                if t in sentinels:    
-                    # sentinels array
-                    row = np.zeros(len(sentinels[t]))
-                    col = np.array(sentinels[t])
-                    data = np.ones(len(sentinels[t]))
-                    sen_nodes = sp.csr_matrix((data, (row, col)),
-                                            shape=(1, self.number_of_nodes), dtype=int)
-                    infected_sentinels = set((x.multiply(sen_nodes) != 0)
+        for t in range(start_time, len(self)):
+            x = x + x * self[t]
+            if t in tests:
+                # tests array
+                row = np.zeros(len(tests[t]))
+                col = np.array(tests[t])
+                data = np.ones(len(tests[t]))
+                test_matrix = sp.csr_matrix((data, (row, col)),
+                                        shape=(1, self.number_of_nodes), dtype=int)
+                if (x.multiply(test_matrix)).nnz > 0:
+                    infected_tests = set((x.multiply(test_matrix) != 0)
                                             .nonzero()[1])
-                    new_infected = infected_sentinels - arrival_times.keys()
-                    arrival_times.update({node: (t, x.nnz) for node in
-                                        new_infected})
+                    positive_tests = {s for s in infected_tests if random.random() > p_false_negative}
+                    if positive_tests: 
+                        return (start_time, t, x.nnz)
 
-        return arrival_times
+        return (start_time, "not detected", x.nnz)
     
     def unfold_accessibility_with_sentinels_strategic(self, sentinels,
                                             start_node=None,

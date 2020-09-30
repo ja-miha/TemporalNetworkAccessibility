@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def read_sentinels(sentinel_path, mpi_rank=0):
+def read_tests_interval(sentinel_path, mpi_rank=0):
     sentinels_old_index = np.genfromtxt(sentinel_path, dtype = int, delimiter = ",")
     sentinels_old_index = sentinels_old_index.tolist()
     old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", delimiter="\t")
@@ -11,7 +11,7 @@ def read_sentinels(sentinel_path, mpi_rank=0):
     sentinels_dic = {i*365 : sentinels for i in range(1, 4)}
     return(sentinels_dic)
 
-def read_sentinels_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
+def read_tests_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
     sentinels_old_index = np.genfromtxt(sentinel_path, dtype = int, delimiter = ",").tolist()#read sentinel file and convert to new index
     old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", delimiter="\t")
     old_to_new_file = old_to_new_file.tolist()
@@ -31,11 +31,11 @@ def read_sentinels_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
     return(test_dic)
 
 def format_results(results, filename):
-    results_ls = []
-    for dic in results:
-        ls = [[dic[sent][0], dic[sent][1], dic[sent][2]] for sent in dic]
-        if ls:
-            results_ls.append(ls[0])
-    df = pd.DataFrame(results_ls, columns = ["start_day", "detection_day", "n_infected"], dtype=int)
+    #results_ls = []
+    #for dic in results:
+        #ls = [[dic[sent][0], dic[sent][1], dic[sent][2]] for sent in dic]
+        #if ls:
+            #results_ls.append(ls[0])
+    df = pd.DataFrame(results, columns = ["start_day", "detection_day", "n_infected"], dtype=int)
     df.to_csv(filename, index=False)
     return(df)
