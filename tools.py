@@ -4,7 +4,7 @@ import pandas as pd
 def read_tests_interval(sentinel_path, mpi_rank=0):
     sentinels_old_index = np.genfromtxt(sentinel_path, dtype = int, delimiter = ",")
     sentinels_old_index = sentinels_old_index.tolist()
-    old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", delimiter="\t")
+    old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", dtype=int, delimiter="\t")
     old_to_new_file = old_to_new_file.tolist()
     old_to_new = {old : new for old, new in old_to_new_file}
     sentinels = [old_to_new[sentinel] for sentinel in sentinels_old_index if sentinel in old_to_new]
@@ -13,7 +13,7 @@ def read_tests_interval(sentinel_path, mpi_rank=0):
 
 def read_tests_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
     sentinels_old_index = np.genfromtxt(sentinel_path, dtype = int, delimiter = ",").tolist()#read sentinel file and convert to new index
-    old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", delimiter="\t")
+    old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", dtype=int, delimiter="\t")
     old_to_new_file = old_to_new_file.tolist()
     old_to_new = {old : new for old, new in old_to_new_file}
     sentinels = [old_to_new[sentinel] for sentinel in sentinels_old_index if sentinel in old_to_new]

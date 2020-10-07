@@ -1151,6 +1151,8 @@ class AdjMatrixSequence(list):
         unfolds accessibility while remembering the infection time for each node, then draws the recovery time 
         from an exponential distribution and removes the node from the network for all later times
 
+        CAUTION: In-place operation. Make a copy first.
+
         Parameters
         ----------
         p_ir : float
