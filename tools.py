@@ -19,7 +19,7 @@ def read_tests_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
     sentinels = [old_to_new[sentinel] for sentinel in sentinels_old_index if sentinel in old_to_new]
     timepoints = np.genfromtxt(timepoint_path, delimiter = ",", dtype=int).tolist()#read timepoints file
     test_dic = {i : [] for i in range(5*365)}#create dictionary {time : [premises_to test]}
-    for i in range(len(sentinels)):
+    for i in range(len(timepoints)):
         for t in timepoints[i]:
             test_dic[t].append(sentinels[i])
     removal_list = []#remove times with no tests

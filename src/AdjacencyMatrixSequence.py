@@ -1083,7 +1083,7 @@ class AdjMatrixSequence(list):
 
     def unfold_accessibility_with_tests(self, tests,
                                             start_node=None,
-                                            start_time=0,
+                                            start_time=0, stop_time = None,
                                             stop_at_detection=True, p_false_negative = 0.5):
         """
         Unfold the accessibility graph including tests.
@@ -1123,12 +1123,15 @@ class AdjMatrixSequence(list):
             start = np.random.randint(self.number_of_nodes)
         #print("Starting epidemic at node ", start)
 
+        if not stop_time:
+            stop_time = len(self)
+            
         # state array
         x = sp.csr_matrix(([1], ([0], [start])),
                           shape=(1, self.number_of_nodes), dtype=int)
 
 
-        for t in range(start_time, len(self)):
+        for t in range(start_time, start_time+stop_time):
             x = x + x * self[t]
             if t in tests:
                 # tests array
@@ -1144,7 +1147,7 @@ class AdjMatrixSequence(list):
                     if positive_tests: 
                         return (start_time, t, x.nnz)
 
-        return (start_time, "not detected", x.nnz)
+        return (start_time, start_time+stop_time, x.nnz)
     
     def make_sir_model(self, p_ir, start_node=None, start_time=0):
         """
@@ -1177,27 +1180,22 @@ class AdjMatrixSequence(list):
         x = sp.csr_matrix(([1], ([0], [start])),
                           shape=(1, self.number_of_nodes), dtype=int)
 
-        arrival_times = dict()
         for t in range(start_time, len(self)):
+            #eliminate zeros
+            self[t].eliminate_zeros()
             new = x * self[t]
             new_infected = set((new != 0).nonzero()[1])
             for node in new_infected:
-                arrival_times[node] = t
+                recovery_time = t + int(random.expovariate(p_ir))
+                if recovery_time < len(self):
+                    for time in range(recovery_time, len(self)):
+                        #set row to zero
+                        self[time].data[self[time].indptr[node]:self[time].indptr[node+1]] = 0
+                        #set column to zero
+                        self[time].data[self[time].indices == node] = 0
+            #for time in range(t, len(self)):
+                #self[t].eliminate_zeros()
             x = x + new
-        recovery_times = dict()
-        for node in arrival_times:
-            recovery_time = arrival_times[node] + int(random.expovariate(p_ir))
-            if recovery_time < len(self):
-                recovery_times[node] = recovery_time
-        
-        for node in recovery_times:
-            for t in range(recovery_times[node], len(self)):
-                #set row to zero
-                self[t].data[self[t].indptr[node]:self[t].indptr[node+1]] = 0
-                #set column to zero
-                self[t].data[self[t].indices == node] = 0
-        for t in range(len(self)):
-            self[t].eliminate_zeros()
 
 
     def unfold_accessibility_with_sentinels_strategic(self, sentinels,
