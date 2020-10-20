@@ -22,6 +22,8 @@ import copy
 import itertools
 import sys
 
+from collections import deque
+
 
 class AdjMatrixSequence(list):
     """
@@ -1145,57 +1147,149 @@ class AdjMatrixSequence(list):
                                             .nonzero()[1])
                     positive_tests = {s for s in infected_tests if random.random() > p_false_negative}
                     if positive_tests: 
-                        return (start_time, t, x.nnz)
+                        return (start_node, start_time, t, x.nnz, 1)
 
-        return (start_time, start_time+stop_time, x.nnz)
-    
-    def make_sir_model(self, p_ir, start_node=None, start_time=0):
+        return (start_node, start_time, start_time+stop_time, x.nnz, 0)
+
+
+    def unfold_accessibility_sir_constant_recovery(self, recovery, return_accessibility_matrix = False):
+
         """
-        unfolds accessibility while remembering the infection time for each node, then draws the recovery time 
-        from an exponential distribution and removes the node from the network for all later times
-
-        CAUTION: In-place operation. Make a copy first.
+        Compute path density for all nodes. Infected nodes will recover after a given timespan.
+        Recovered nodes can not be infected again.
 
         Parameters
         ----------
-        p_ir : float
-            recovery rate
-        start_node : int
-            place of first infection
+        recovery : int
+            Time after which an infected node recovers and cannot be infected again.
+        return_accessibility_matrix : Boolean, optional
+            Returns the whole accessibility matrix. The matrix can be huge for
+            large networks. The default is False.
 
         Returns
         -------
-        None.
+        list
+            Cumulative path density vs. time.
+
+        Usage
+        -----
+        >>> c = At.unfold_accessibility()
+        >>> c, r = At.unfold_accessibility_memory_efficient(
+                    return_accessibility_matrix=True)
 
         """
 
+        P = self[0].copy()
+        D = sp.identity(self.number_of_nodes, dtype=np.int32)
+        P = P + D
+        cumu = [P.nnz]
+        cumu_rec = [0]
+        empty = csr_matrix((self.number_of_nodes, self.number_of_nodes), dtype=np.int32)
+        history = deque([empty for i in range(recovery)], maxlen=recovery)
+        history.append(P)
+        recovered = empty
+
+        for i in range(1, len(self)):
+            self.bool_int_matrix(P) 
+            P = P + P * self[i]
+            P -= P.multiply(recovered)
+            recovered += history[0]
+            self.bool_int_matrix(recovered)
+            history.append(P)
+            cumu.append(P.nnz)
+            cumu_rec.append(recovered.nnz)
+
+
+        if return_accessibility_matrix:
+            P += recovered
+            self.bool_int_matrix(P)
+            P = P.astype('bool')
+            P = P.astype('int')
+            return P, cumu, cumu_rec
+        else:
+            return cumu, cumu_rec
+
+    def unfold_accessibility_sir_random_recovery(self, p_ir, start_time = 0, return_accessibility_matrix = False):
+
+        P = self[0].copy()
+        D = sp.identity(self.number_of_nodes, dtype=np.int32)
+        P = P + D
+        recovered = self.random_submatrix(P, p_ir)
+        cumu = [P.nnz]
+        cumu_rec = [recovered.nnz]
+
+        for i in range(1, len(self)):
+            self.bool_int_matrix(P)
+            P = P + P * self[i]  
+            P -= P.multiply(recovered)
+            recovered += self.random_submatrix(P, p=p_ir)
+            self.bool_int_matrix(recovered)
+            cumu.append(P.nnz)
+            cumu_rec.append(recovered.nnz)
+
+        if return_accessibility_matrix:
+            P += recovered
+            P = P.astype('bool')
+            P = P.astype('int')
+            return P, cumu, cumu_rec
+        else:
+            return cumu, cumu_rec
+
+    def unfold_accessibility_sir_constant_recovery_single_node(self, recovery, start_time = 0, start_node = None, return_accessibility_matrix = False):
+        
         # set start_node for epidemic
         if start_node or start_node is 0:
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
-        #print("Starting epidemic at node ", start)
+        print("Starting epidemic at node ", start)
 
-        # state array
-        x = sp.csr_matrix(([1], ([0], [start])),
-                          shape=(1, self.number_of_nodes), dtype=int)
+        x = sp.csr_matrix(([1], ([0], [start])), shape=(1, self.number_of_nodes), dtype=int)
+        x = x + x * self[0]
+        cumu = [x.nnz]
+        cumu_rec = [0]
+        empty = csr_matrix((1, self.number_of_nodes), dtype=np.int32)
+        history = deque([empty for i in range(recovery)], maxlen=recovery)
+        recovered = empty
+        
+        for i in range(1, len(self)): 
+            self.bool_int_matrix(x)
+            x = x + x * self[i] 
+            x -= x.multiply(recovered)
+            recovered += history[0]
+            self.bool_int_matrix(recovered)
+            history.append(x)
+            cumu.append(x.nnz)
+            cumu_rec.append(recovered.nnz)
 
-        for t in range(start_time, len(self)):
-            #eliminate zeros
-            self[t].eliminate_zeros()
-            new = x * self[t]
-            new_infected = set((new != 0).nonzero()[1])
-            for node in new_infected:
-                recovery_time = t + int(random.expovariate(p_ir))
-                if recovery_time < len(self):
-                    for time in range(recovery_time, len(self)):
-                        #set row to zero
-                        self[time].data[self[time].indptr[node]:self[time].indptr[node+1]] = 0
-                        #set column to zero
-                        self[time].data[self[time].indices == node] = 0
-            #for time in range(t, len(self)):
-                #self[t].eliminate_zeros()
-            x = x + new
+        return cumu, cumu_rec
+    
+    def unfold_accessibility_sir_random_recovery_single_node(self, p_ir, start_time = 0, start_node = None, return_accessibility_matrix = False):
+        
+        # set start_node for epidemic
+        if start_node or start_node is 0:
+            start = start_node
+        else:
+            start = np.random.randint(self.number_of_nodes)
+        print("Starting epidemic at node ", start)
+
+        x = sp.csr_matrix(([1], ([0], [start])), shape=(1, self.number_of_nodes), dtype=int)
+        x = x + x * self[0]
+        recovered = x.multiply(csr_matrix(([1 if random.random()<p_ir else 0 for i in range(len(x.data))], x.indices, x.indptr), shape=(1, self.number_of_nodes))) #self.random_submatrix(x, p=p_ir)
+        cumu = [x.nnz]
+        cumu_rec = [recovered.nnz]
+
+        
+        for i in range(1, len(self)):
+            self.bool_int_matrix(x) 
+            x = x + x * self[i] 
+            x -= x.multiply(recovered)
+            recovered += x.multiply(csr_matrix(([1 if random.random()<p_ir else 0 for i in range(len(x.data))], x.indices, x.indptr), shape=(1, self.number_of_nodes)))
+            self.bool_int_matrix(recovered)
+            cumu.append(x.nnz)
+            cumu_rec.append(recovered.nnz)
+
+        return cumu, cumu_rec
 
 
     def unfold_accessibility_with_sentinels_strategic(self, sentinels,

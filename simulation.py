@@ -26,13 +26,12 @@ timepoints_path = "Synset/timepoint_13oct.txt"
 
 if rank < 100:
     file_path = "Synset/syndata"+str(rank)+"/dataset.txt"
-    sen_filenames = ["degree_sentil", "betw_sentil", "kshel_sentil"]
+    #sen_filenames = ["degree_sentil", "betw_sentil", "kshel_sentil"]
+    sen_filenames = ["random_sentil"]
     for sen_filename in sen_filenames:
-        sentinel_path = "Synset/syndata"+str(rank)+"/"+sen_filename+".txt"
-        #file_path = "syndata1/syndata1.txt"
-        #sentinel_path = "syndata1/kshell_sentil.txt"
-        #df = pd.read_csv(file_path, delimiter=",", names=["source", "target", "day", "weight"])
-        #df.to_csv(file_path, sep = "\t", header=False, index = False)
+        
+        #sentinel_path = "Synset/syndata"+str(rank)+"/"+sen_filename+".txt"
+        sentinel_path = "randomplacement/"+sen_filename+str(rank)+".txt"
 
         start_time=time.time()
         AMS = AdjMatrixSequence(file_path, directed= True, write_label_file=True, mpi_rank=rank)#create Adjecency Matrix Object
@@ -48,6 +47,6 @@ if rank < 100:
             result = si_model.unfold_accessibility_with_tests(tests, start, start_time=inf_time, stop_time=expert_detection, p_false_negative=p_false_neg)
             results.append(result)
 
-        format_results(results, "results/"+sen_filename+"_results_timepoint_13oct_"+str(rank)+".txt")
+        format_results(results, "results/"+sen_filename+"_results_timepoint_13oct_"+str(rank)+".txt", rank)
 
         print(time.time()-start_time)

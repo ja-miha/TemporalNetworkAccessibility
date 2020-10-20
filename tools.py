@@ -30,12 +30,23 @@ def read_tests_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
         test_dic.pop(test)
     return(test_dic)
 
-def format_results(results, filename):
-    #results_ls = []
-    #for dic in results:
-        #ls = [[dic[sent][0], dic[sent][1], dic[sent][2]] for sent in dic]
-        #if ls:
-            #results_ls.append(ls[0])
-    df = pd.DataFrame(results, columns = ["start_day", "detection_day", "n_infected"], dtype=int)
+def node_type(node, new_to_old):
+    nodeid = new_to_old[node]
+    if nodeid < 4600:
+        return(1)
+    elif nodeid < 8000:
+        return(2)
+    elif nodeid < 8800:
+        return(3)
+    else:
+        return(4)
+
+
+def format_results(results, filename, mpi_rank):
+    old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", dtype=int, delimiter="\t")
+    old_to_new_file = old_to_new_file.tolist()
+    new_to_old = {new : old for old, new in old_to_new_file}
+    df = pd.DataFrame(results, columns = ["start_type", "start_day", "detection_day", "n_infected", "detected"], dtype=int)
+    df["start_type"] = df["start_type"].transform(lambda n: node_type(n, new_to_old))
     df.to_csv(filename, index=False)
     return(df)
