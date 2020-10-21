@@ -41,7 +41,6 @@ def node_type(node, new_to_old):
     else:
         return(4)
 
-
 def format_results(results, filename, mpi_rank):
     old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", dtype=int, delimiter="\t")
     old_to_new_file = old_to_new_file.tolist()

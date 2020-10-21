@@ -1110,8 +1110,8 @@ class AdjMatrixSequence(list):
 
         Returns
         -------
-        tupel with (start_time, arrival_time, infected premises).
-        arrival time can be "not detected" if there is no positive test.
+        tupel with (start_node, start_time, arrival_time, infected premises, detected(bool)).
+        arrival time will be start_time+stop_time if there is no detection
 
         """
         # raise error if sentinel node not in network
@@ -1168,14 +1168,7 @@ class AdjMatrixSequence(list):
 
         Returns
         -------
-        list
-            Cumulative path density vs. time.
-
-        Usage
-        -----
-        >>> c = At.unfold_accessibility()
-        >>> c, r = At.unfold_accessibility_memory_efficient(
-                    return_accessibility_matrix=True)
+        
 
         """
 
@@ -1189,11 +1182,13 @@ class AdjMatrixSequence(list):
         history.append(P)
         recovered = empty
 
-        for i in range(1, len(self)):
-            self.bool_int_matrix(P) 
+        for i in range(1, len(self)): 
             P = P + P * self[i]
             P -= P.multiply(recovered)
             recovered += history[0]
+            P.eliminate_zeros()
+            self.bool_int_matrix(P)
+            recovered.eliminate_zeros()
             self.bool_int_matrix(recovered)
             history.append(P)
             cumu.append(P.nnz)
@@ -1209,23 +1204,46 @@ class AdjMatrixSequence(list):
         else:
             return cumu, cumu_rec
 
-    def unfold_accessibility_sir_random_recovery(self, p_ir, start_time = 0, return_accessibility_matrix = False):
+    def unfold_accessibility_sir_random_recovery(self, p_ir, return_accessibility_matrix = False):
+
+        """
+        Compute path density for all nodes. Infected nodes will recover spontaneosly with a given probability.
+        Recovered nodes can not be infected again.
+
+        Parameters
+        ----------
+        p_ir : float
+            Probability that a node recovers spontaneously. Should be between 0 and 1.
+        return_accessibility_matrix : Boolean, optional
+            Returns the whole accessibility matrix. The matrix can be huge for
+            large networks. The default is False.
+
+        Returns
+        -------
+        
+
+        """
 
         P = self[0].copy()
         D = sp.identity(self.number_of_nodes, dtype=np.int32)
         P = P + D
-        recovered = self.random_submatrix(P, p_ir)
+        recovered = P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
+        #recovered = self.random_submatrix(P, p_ir)
         cumu = [P.nnz]
         cumu_rec = [recovered.nnz]
 
         for i in range(1, len(self)):
-            self.bool_int_matrix(P)
-            P = P + P * self[i]  
+            P = P + P * self[i]
             P -= P.multiply(recovered)
-            recovered += self.random_submatrix(P, p=p_ir)
+            recovered += P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
+            #recovered += self.random_submatrix(P, p=p_ir)
+            P.eliminate_zeros()
+            self.bool_int_matrix(P)
+            recovered.eliminate_zeros()
             self.bool_int_matrix(recovered)
             cumu.append(P.nnz)
             cumu_rec.append(recovered.nnz)
+            print(i)
 
         if return_accessibility_matrix:
             P += recovered
@@ -1235,8 +1253,28 @@ class AdjMatrixSequence(list):
         else:
             return cumu, cumu_rec
 
-    def unfold_accessibility_sir_constant_recovery_single_node(self, recovery, start_time = 0, start_node = None, return_accessibility_matrix = False):
+    def unfold_accessibility_sir_constant_recovery_single_node(self, recovery, start_node = None, return_accessibility_matrix = False):
         
+        """
+        Compute path density for a single node. Infected nodes will recover after a given timespan.
+        Recovered nodes can not be infected again.
+
+        Parameters
+        ----------
+        recovery : int
+            Time after which an infected node recovers and cannot be infected again.
+        start_node : int, optional
+            First infected node.
+        return_accessibility_matrix : Boolean, optional
+            Returns the whole accessibility matrix. The matrix can be huge for
+            large networks. The default is False.
+
+        Returns
+        -------
+        
+
+        """
+
         # set start_node for epidemic
         if start_node or start_node is 0:
             start = start_node
@@ -1249,14 +1287,16 @@ class AdjMatrixSequence(list):
         cumu = [x.nnz]
         cumu_rec = [0]
         empty = csr_matrix((1, self.number_of_nodes), dtype=np.int32)
-        history = deque([empty for i in range(recovery)], maxlen=recovery)
-        recovered = empty
+        history = deque([empty.copy() for i in range(recovery)], maxlen=recovery)
+        recovered = empty.copy()
         
         for i in range(1, len(self)): 
-            self.bool_int_matrix(x)
-            x = x + x * self[i] 
+            x = x + x * self[i]
             x -= x.multiply(recovered)
             recovered += history[0]
+            x.eliminate_zeros()
+            self.bool_int_matrix(x)
+            recovered.eliminate_zeros()
             self.bool_int_matrix(recovered)
             history.append(x)
             cumu.append(x.nnz)
@@ -1264,8 +1304,28 @@ class AdjMatrixSequence(list):
 
         return cumu, cumu_rec
     
-    def unfold_accessibility_sir_random_recovery_single_node(self, p_ir, start_time = 0, start_node = None, return_accessibility_matrix = False):
+    def unfold_accessibility_sir_random_recovery_single_node(self, p_ir, start_node = None, return_accessibility_matrix = False):
         
+        """
+        Compute path density for a single node. Infected nodes will recover spontaneosly with a given probability.
+        Recovered nodes can not be infected again.
+
+        Parameters
+        ----------
+        p_ir : float
+            Probability that a node recovers spontaneously. Should be between 0 and 1.
+        start_node : int, oplional
+            First infected node.
+        return_accessibility_matrix : Boolean, optional
+            Returns the whole accessibility matrix. The matrix can be huge for
+            large networks. The default is False.
+
+        Returns
+        -------
+        
+
+        """
+
         # set start_node for epidemic
         if start_node or start_node is 0:
             start = start_node
@@ -1275,101 +1335,25 @@ class AdjMatrixSequence(list):
 
         x = sp.csr_matrix(([1], ([0], [start])), shape=(1, self.number_of_nodes), dtype=int)
         x = x + x * self[0]
-        recovered = x.multiply(csr_matrix(([1 if random.random()<p_ir else 0 for i in range(len(x.data))], x.indices, x.indptr), shape=(1, self.number_of_nodes))) #self.random_submatrix(x, p=p_ir)
+        recovered = x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
+        recovered.eliminate_zeros()
+        self.bool_int_matrix(recovered)
         cumu = [x.nnz]
         cumu_rec = [recovered.nnz]
 
         
-        for i in range(1, len(self)):
-            self.bool_int_matrix(x) 
-            x = x + x * self[i] 
+        for i in range(1, len(self)): 
+            x = x + x * self[i]
             x -= x.multiply(recovered)
-            recovered += x.multiply(csr_matrix(([1 if random.random()<p_ir else 0 for i in range(len(x.data))], x.indices, x.indptr), shape=(1, self.number_of_nodes)))
+            recovered += x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
+            x.eliminate_zeros()
+            self.bool_int_matrix(x)
+            recovered.eliminate_zeros()
             self.bool_int_matrix(recovered)
             cumu.append(x.nnz)
             cumu_rec.append(recovered.nnz)
 
         return cumu, cumu_rec
-
-
-    def unfold_accessibility_with_sentinels_strategic(self, sentinels,
-                                            start_node=None,
-                                            start_time=0,
-                                            stop_at_detection=False, interval=7, chunksize=1):
-        """
-        Unfold the accessibility graph including sentinel nodes.
-
-        Sentinel nodes are for disease detection. The method returns the
-        arrival times of an epidemic at the *sentinels* starting at
-        *start_node*. In order to simulate SI-like spreading the network
-        should be diluted.
-
-        Parameters
-        ----------
-        sentinels : list
-            list of sentinel nodes.
-        start_node : int, optional
-            index node of the epidemic. The default is None. If default is used
-            staring node is chosen at random.
-        start_time : int, optional
-            starting time for the epidemic. The default is 0.
-        stop_at_detection : Boolean, optional
-            If true, the epidemic is stopped, when it arrives at any sentonel
-            node. The default is False.
-
-        Returns
-        -------
-        Dictionary. Keys are sentinel nodes and values are tuples with
-        (arrival time, outbreak size).
-
-        """
-        # raise error if sentinel node not in network
-        #if max(sentinels) >= self.number_of_nodes:
-            #raise ValueError("Sentinel node not in network.")
-
-        # set start_node for epidemic
-        if start_node or start_node is 0:
-            start = start_node
-        else:
-            start = np.random.randint(self.number_of_nodes)
-        #print("Starting epidemic at node ", start)
-
-        # state array
-        x = sp.csr_matrix(([1], ([0], [start])),
-                          shape=(1, self.number_of_nodes), dtype=int)
-
-        # sentinels array
-        row = np.zeros(len(sentinels))
-        col = np.array(sentinels)
-        data = np.ones(len(sentinels))
-        sen_nodes = sp.csr_matrix((data, (row, col)),
-                                shape=(1, self.number_of_nodes), dtype=int)
-
-        # sentinel arrival time dict
-        arrival_times = dict()
-
-        if stop_at_detection:
-            for t in range(start_time, len(self)):
-                x = x + x * self[t]
-                if t%interval==0:
-                    sen_nodes_subset = self.random_submatrix(sen_nodes, p=chunksize)
-                    if (x.multiply(sen_nodes_subset)).nnz > 0:
-                        infected_sentinels = set((x.multiply(sen_nodes_subset) != 0)
-                                                .nonzero()[1])
-                        arrival_times.update({node: (t, x.nnz) for node in
-                                            infected_sentinels})
-                        break
-        else:
-            for t in range(start_time, len(self)):
-                x = x + x * self[t]
-                if t%interval==0:    
-                    infected_sentinels = set((x.multiply(self.random_submatrix(sen_nodes, p=chunksize)) != 0)
-                                            .nonzero()[1])
-                    new_infected = infected_sentinels - arrival_times.keys()
-                    arrival_times.update({node: (t, x.nnz) for node in
-                                        new_infected})
-
-        return arrival_times
 
 
     def trace_forward(self, start_node, start_time=0, stop=None):
