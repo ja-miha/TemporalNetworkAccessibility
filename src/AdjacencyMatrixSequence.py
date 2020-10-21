@@ -1243,7 +1243,6 @@ class AdjMatrixSequence(list):
             self.bool_int_matrix(recovered)
             cumu.append(P.nnz)
             cumu_rec.append(recovered.nnz)
-            print(i)
 
         if return_accessibility_matrix:
             P += recovered
