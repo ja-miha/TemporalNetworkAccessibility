@@ -48,11 +48,11 @@ src/oldindex_matrixfriendly.txt
 
 /syndata1
 
-test.py
+/Synset
 
-test2.py
+test*
 
-*.ipynb
+prepare_input.ipynb
 
 
 
