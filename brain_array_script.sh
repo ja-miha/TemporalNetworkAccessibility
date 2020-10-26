@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J sirds                            # job name
+#SBATCH -J si                            # job name
 #SBATCH -N 1                                 # number of nodes
 #SBATCH -n 8                                   # number of MPI processes, here 16 per node
 #SBATCH --partition=compute         # choose nodes from partition

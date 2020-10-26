@@ -9,7 +9,8 @@ def read_tests_interval(sentinel_path, mpi_rank=0):
     old_to_new = {old : new for old, new in old_to_new_file}
     sentinels = [old_to_new[sentinel] for sentinel in sentinels_old_index if sentinel in old_to_new]
     sentinels_dic = {i*365 : sentinels for i in range(1, 4)}
-    return(sentinels_dic)
+    mx = old_to_new[8800]
+    return sentinels_dic, mx
 
 def read_tests_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
     sentinels_old_index = np.genfromtxt(sentinel_path, dtype = int, delimiter = ",").tolist()#read sentinel file and convert to new index
@@ -28,10 +29,10 @@ def read_tests_timepoints(sentinel_path, timepoint_path, mpi_rank=0):
             removal_list.append(test)
     for test in removal_list:
         test_dic.pop(test)
-    return(test_dic)
+    mx = old_to_new[8800]
+    return test_dic, mx
 
-def node_type(node, new_to_old):
-    nodeid = new_to_old[node]
+def node_type(nodeid):
     if nodeid < 4600:
         return(1)
     elif nodeid < 8000:
@@ -45,7 +46,8 @@ def format_results(results, filename, mpi_rank):
     old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(mpi_rank)+".txt", dtype=int, delimiter="\t")
     old_to_new_file = old_to_new_file.tolist()
     new_to_old = {new : old for old, new in old_to_new_file}
-    df = pd.DataFrame(results, columns = ["start_type", "start_day", "detection_day", "n_infected", "detected"], dtype=int)
-    df["start_type"] = df["start_type"].transform(lambda n: node_type(n, new_to_old))
+    df = pd.DataFrame(results, columns = ["start_node", "start_day", "detection_day", "n_infected", "detected"], dtype=int)
+    df["start_node"] = df["start_node"].transform(lambda n: new_to_old[n])
+    df["start_type"] = df["start_node"].transform(node_type)
     df.to_csv(filename, index=False)
     return(df)

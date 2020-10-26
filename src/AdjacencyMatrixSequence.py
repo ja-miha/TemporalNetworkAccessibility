@@ -1183,7 +1183,6 @@ class AdjMatrixSequence(list):
         recovered = empty
 
         for i in range(1, len(self)): 
-            P = P + P * self[i]
             P -= P.multiply(recovered)
             recovered += history[0]
             P.eliminate_zeros()
@@ -1193,6 +1192,7 @@ class AdjMatrixSequence(list):
             history.append(P)
             cumu.append(P.nnz)
             cumu_rec.append(recovered.nnz)
+            P = P + P * self[i]
 
 
         if return_accessibility_matrix:
@@ -1233,7 +1233,6 @@ class AdjMatrixSequence(list):
         cumu_rec = [recovered.nnz]
 
         for i in range(1, len(self)):
-            P = P + P * self[i]
             P -= P.multiply(recovered)
             recovered += P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
             #recovered += self.random_submatrix(P, p=p_ir)
@@ -1243,6 +1242,7 @@ class AdjMatrixSequence(list):
             self.bool_int_matrix(recovered)
             cumu.append(P.nnz)
             cumu_rec.append(recovered.nnz)
+            P = P + P * self[i]
 
         if return_accessibility_matrix:
             P += recovered
@@ -1290,7 +1290,6 @@ class AdjMatrixSequence(list):
         recovered = empty.copy()
         
         for i in range(1, len(self)): 
-            x = x + x * self[i]
             x -= x.multiply(recovered)
             recovered += history[0]
             x.eliminate_zeros()
@@ -1300,6 +1299,7 @@ class AdjMatrixSequence(list):
             history.append(x)
             cumu.append(x.nnz)
             cumu_rec.append(recovered.nnz)
+            x = x + x * self[i]
 
         return cumu, cumu_rec
     
@@ -1342,7 +1342,6 @@ class AdjMatrixSequence(list):
 
         
         for i in range(1, len(self)): 
-            x = x + x * self[i]
             x -= x.multiply(recovered)
             recovered += x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
             x.eliminate_zeros()
@@ -1351,9 +1350,10 @@ class AdjMatrixSequence(list):
             self.bool_int_matrix(recovered)
             cumu.append(x.nnz)
             cumu_rec.append(recovered.nnz)
+            x = x + x * self[i]
 
         return cumu, cumu_rec
-
+          
 
     def trace_forward(self, start_node, start_time=0, stop=None):
         """
