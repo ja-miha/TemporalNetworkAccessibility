@@ -42,13 +42,14 @@ class AdjMatrixSequence(list):
     """
 
     def __init__(self, edgelist_fname, directed, write_label_file=False,
-                 columns=(0, 1, 2), firsttime=None, lasttime=None, mpi_rank=0):
+                 columns=(0, 1, 2), firsttime=None, lasttime=None, tests=None, mpi_rank=0):
         list.__init__(self)
         self.first_day = firsttime
         self.last_day = lasttime
         self.fname = edgelist_fname
         self.cols = columns
         self.label_file = write_label_file
+        if tests: self.label_file = True
         self.is_directed = directed
         self.mpi_rank = mpi_rank
 
@@ -56,6 +57,7 @@ class AdjMatrixSequence(list):
         if not self.is_directed:
             self.as_undirected()
         self.number_of_nodes = np.shape(self[0])[0]
+        if tests: self.add_tests(tests)
         self.check_py_version()
 
     def check_py_version(self):
@@ -129,6 +131,20 @@ class AdjMatrixSequence(list):
         for d in dct:
             dct_s[d-self.first_day] = dct[d]
         return dct_s.items()
+    
+    def groupByTime_tests(self, testpoints):
+        """Return list of tupels: [(d,[u,...]),...]."""
+        dct = defaultdict(list)
+        for u, d in testpoints:
+            dct[d].append(u)
+        dct_s = dict.fromkeys(range(0, self.last_day-self.first_day), [])
+        for d in dct:
+            dct_s[d-self.first_day] = dct[d]
+        return dct_s.items()
+        #dct_s = dict.fromkeys(range(0, len(self)), [])
+        #for d in dct:
+        #    dct_s[d] = dct[d]
+        #return dct_s.items()
 
     def reindex(self, edges):
         """
@@ -866,6 +882,40 @@ class AdjMatrixSequence(list):
                            dtype=np.int32)
             self.append(m)
 
+    def create_test_vectors(self, tests, reidx=True):
+        """Create list of sparse vectors (for simulating testing) from input tests file."""
+        testpoints = loadtxt(tests, dtype=int, usecols=self.testcols)
+        #_, days = np.array(list(zip(*testpoints)))
+
+        #if not self.first_day:
+         #   self.first_day = min(days)
+        #if not self.last_day:
+         #   self.last_day = max(days)
+
+        # use only times between firsttime and lasttime
+        testpoints = [(u, d) for u, d in testpoints if
+                 (d >= self.first_day) and (d <= self.last_day)]
+
+        if reidx:
+            # get dictionary of new indices
+            old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
+            re_dct = {old : new for old, new in old_to_new_file}
+
+            # reindex using this dictionary
+            testpoints = [(re_dct[u], d) for u, d in testpoints]
+
+        testpoints = self.groupByTime_tests(testpoints)
+
+        # the actual construction of the sparse matrices
+        mx_index = len(re_dct)
+        for d, us in testpoints:
+            vs = [0 for i in range(len(us))]
+            bs = [True for i in range(len(us))]
+
+            m = csr_matrix((bs, (vs, us)), shape=(1, mx_index),
+                           dtype=np.int32)
+            self.tests.append(m)
+
     def bool_int_matrix(self, M):
         """Return matrix with only np.int64: ones."""
         M.data = np.ones_like(M.data)
@@ -1106,7 +1156,7 @@ class AdjMatrixSequence(list):
             If true, the epidemic is stopped, when it arrives at any sentonel
             node. The default is False.
         p_false_negative : float, optional
-            probability of a false positive test. The default is 0.5.
+            probability of a false negative test. The default is 0.5.
 
         Returns
         -------
@@ -1126,7 +1176,7 @@ class AdjMatrixSequence(list):
         #print("Starting epidemic at node ", start)
 
         if not stop_time:
-            stop_time = len(self)
+            stop_time = len(self) - start_time
             
         # state array
         x = sp.csr_matrix(([1], ([0], [start])),
@@ -1147,9 +1197,87 @@ class AdjMatrixSequence(list):
                                             .nonzero()[1])
                     positive_tests = {s for s in infected_tests if random.random() > p_false_negative}
                     if positive_tests: 
-                        return (start_node, start_time, t, x.nnz, 1)
+                        return (start_node, start_time, t, x.nnz, 1), x.indices
 
-        return (start_node, start_time, start_time+stop_time, x.nnz, 0)
+        return (start_node, start_time, start_time+stop_time, x.nnz, 0), x.indices
+
+    def add_tests(self, tests, reindex=True, test_columns=(0, 1)):
+        if reindex and not self.label_file:
+            raise ValueError('Label file needed for reindexing. Set write_label_file=True when initialising.')
+        self.tests = list()
+        self.testcols = test_columns
+        self.create_test_vectors(tests, reidx=reindex)
+
+    def unfold_accessibility_with_tests_better(self,
+                                            start_node=None,
+                                            start_time=0, stop_time = None,
+                                            stop_at_detection=True, p_false_negative = 0.5, p_si=1,
+                                            reindex=True):
+        """
+        Unfold the accessibility graph including tests.
+
+        The simulation stops, as soon as there is a positive test (or the end of time is reached). In order to simulate SI-like spreading the network
+        should be diluted.
+
+        Parameters
+        ----------
+        start_node : int, optional
+            index node of the epidemic. The default is None. If default is used
+            staring node is chosen at random.
+        start_time : int, optional
+            starting time for the epidemic. The default is 0.
+        stop_at_detection : Boolean, optional
+            If true, the epidemic is stopped, when it arrives at any sentinel
+            node. The default is False.
+        p_false_negative : float, optional
+            probability of a false negative test. The default is 0.5.
+
+        Returns
+        -------
+        tupel with (start_node, start_time, arrival_time, infected premises, detected(bool)).
+        arrival time will be start_time+stop_time if there is no detection
+
+        """
+
+        # set start_node for epidemic
+        if start_node or start_node is 0:
+            start = start_node
+        else:
+            start = np.random.randint(self.number_of_nodes)
+        #print("Starting epidemic at node ", start)
+
+        if reindex:
+            if not self.label_file: raise ValueError('Label file needed for reindexing. Set write_label_file=True when initialising.')
+            # get dictionary of new indices
+            old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
+            re_dct = {new : old for old, new in old_to_new_file}
+            if start_node:
+                start = re_dct[start_node]
+        
+        if not stop_time:
+            stop_time = len(self) - start_time
+            
+        # state array
+        x = sp.csr_matrix(([1], ([0], [start])),
+                          shape=(1, self.number_of_nodes), dtype=int)
+
+
+        for t in range(start_time, start_time+stop_time):
+            #x = x + x * self[t]
+            x = x + x * self[t].multiply(csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape))
+            if (x.multiply(self.tests[t])).nnz > 0:
+                infected_tests = set((x.multiply(self.tests[t]) != 0)
+                                        .nonzero()[1])
+                positive_tests = {s for s in infected_tests if random.random() > p_false_negative}
+                if positive_tests: 
+                    if reindex:
+                        return (re_dct[start_node], start_time, t, x.nnz, 1), [re_dct[i] for i in x.indices]
+                    else:
+                        return (start_node, start_time, t, x.nnz, 1), x.indices
+        if reindex:
+            return (re_dct[start_node], start_time, start_time+stop_time, x.nnz, 1), [re_dct[i] for i in x.indices]
+        else:
+            return (start_node, start_time, start_time+stop_time, x.nnz, 0), x.indices
 
 
     def unfold_accessibility_sir_constant_recovery(self, recovery, return_accessibility_matrix = False):
