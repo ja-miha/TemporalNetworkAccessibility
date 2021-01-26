@@ -1092,7 +1092,7 @@ class AdjMatrixSequence(list):
             raise ValueError("Sentinel node not in network.")
 
         # set start_node for epidemic
-        if start_node or start_node is 0:
+        if start_node or start_node == 0:
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
@@ -1169,7 +1169,7 @@ class AdjMatrixSequence(list):
             #raise ValueError("Sentinel node not in network.")
 
         # set start_node for epidemic
-        if start_node or start_node is 0:
+        if start_node or start_node == 0:
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
@@ -1240,11 +1240,11 @@ class AdjMatrixSequence(list):
         """
 
         # set start_node for epidemic
-        if start_node or start_node is 0:
+        if start_node or start_node == 0:
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
-        #print("Starting epidemic at node ", start)
+        print("Starting epidemic at node ", start)
 
         if reindex:
             if not self.label_file: raise ValueError('Label file needed for reindexing. Set write_label_file=True when initialising.')
@@ -1403,7 +1403,7 @@ class AdjMatrixSequence(list):
         """
 
         # set start_node for epidemic
-        if start_node or start_node is 0:
+        if start_node or start_node == 0:
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
@@ -1454,7 +1454,7 @@ class AdjMatrixSequence(list):
         """
 
         # set start_node for epidemic
-        if start_node or start_node is 0:
+        if start_node or start_node == 0:
             start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
