@@ -26,7 +26,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 n_tasks = comm.Get_size()
 
-rank = rank + (n_array-1) * 8
+rank = rank + (n_array-1) * 8 # n_tasks
 
 if rank < n_nets:
     network_path = network_pattern % rank

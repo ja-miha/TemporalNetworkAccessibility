@@ -160,6 +160,12 @@ class AdjMatrixSequence(list):
         return old_to_new
     
     def newindex(self, nodeids):
+         """
+        returns the new index of a node after reindexing
+
+        attention: has to load the whole file of node indexes every time it's called.
+
+        """
         old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
         old_to_new = {old : new for old, new in old_to_new_file}
         if hasattr(nodeids, '__iter__'):
@@ -168,6 +174,12 @@ class AdjMatrixSequence(list):
             return old_to_new[nodeids]
 
     def oldindex(self, nodeids):
+        """
+        returns the index a reindexed node had before reindexing
+
+        attention: has to load the whole file of node indexes every time it's called.
+
+        """
         old_to_new = open("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", "r")
         if hasattr(nodeids, '__iter__'):
             lines = old_to_new.readlines()
@@ -1152,7 +1164,8 @@ class AdjMatrixSequence(list):
 
     def add_tests(self, tests, reindex=True, test_columns=(0, 1)):
         """
-        Add tests to the AdjecencyMatrixSequence object. If there were already tests given, those are overwritten. Tests are needed for the unfold_accessibility_with_tests_better method.
+        Add tests to the AdjecencyMatrixSequence object. If there were already tests given, those are overwritten. 
+        Tests are needed for the unfold_accessibility_with_tests method.
 
         Parameters
         ----------
@@ -1176,9 +1189,10 @@ class AdjMatrixSequence(list):
                                             p_false_negative = 0.5, p_si=1,
                                             dereindex=True, reindex=False):
         """
-        Unfold the accessibility graph including tests.
+        Unfold the accessibility graph including tests. 
+        Add tests when initializing the object or with the add_tests method.
 
-        The simulation stops, as soon as there is a positive test (or the end of time is reached).
+        The simulation stops, as soon as there is a positive test (or after stop_time steps if there was no positive test).
 
         Parameters
         ----------
