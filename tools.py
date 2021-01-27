@@ -24,7 +24,7 @@ def generate_tests(nodefile, timefile, mpi_rank=0):
     np.savetxt(path, better_tests, delimiter="\t", fmt="%i")#, sep="\t")
     return path
 
-def format_results_better(results, barn_lists, filename, mpi_rank):
+def format_results(results, barn_lists, filename, mpi_rank):
     barn_sizes = np.genfromtxt("Synset/syndata%i/barn_size.txt" % (mpi_rank), dtype=int, delimiter=",").tolist()
     infected_capacity = [sum([barn_sizes[element] for element in ls]) for ls in barn_lists]
     df = pd.DataFrame(results, columns = ["start_node", "start_day", "detection_day", "n_infected", "detected"], dtype=int)

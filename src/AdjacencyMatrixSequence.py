@@ -1170,7 +1170,7 @@ class AdjMatrixSequence(list):
         self.testcols = test_columns
         self.create_test_vectors(tests, reidx=reindex)
 
-    def unfold_accessibility_with_tests_better(self,
+    def unfold_accessibility_with_tests(self,
                                             start_node=None,
                                             start_time=0, stop_time = None,
                                             p_false_negative = 0.5, p_si=1,

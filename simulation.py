@@ -2,7 +2,7 @@ import time
 from src.AdjacencyMatrixSequence import AdjMatrixSequence
 import numpy as np 
 from mpi4py import MPI
-from tools import generate_tests, format_results_better
+from tools import generate_tests, format_results
 import random as rn
 import pandas as pd 
 import sys
@@ -53,10 +53,10 @@ if rank < n_nets:
         barn_lists = []
         for start in starts:
             inf_time = rn.choice(range(start_timespan))
-            result, infected_barns = si_model.unfold_accessibility_with_tests_better(start_node=start, start_time=inf_time, stop_time=expert_detection, p_false_negative=p_false_neg, p_si=p_si)
+            result, infected_barns = si_model.unfold_accessibility_with_tests(start_node=start, start_time=inf_time, stop_time=expert_detection, p_false_negative=p_false_neg, p_si=p_si)
             results.append(result)
             barn_lists.append(infected_barns)
 
-        format_results_better(results, barn_lists, "results/"+sen_filename+"_results_timepoint_13oct_"+str(rank)+"_better.txt", rank)
+        format_results(results, barn_lists, "results/"+sen_filename+"_results_timepoint_13oct_"+str(rank)+".txt", rank)
 
         print(time.time()-start_time)
