@@ -1276,6 +1276,8 @@ class AdjMatrixSequence(list):
 
         Parameters
         ----------
+        p_si : float, optional
+            probability of becoming infected from contact with an infected node. Default is 0.5.
         recovery : int
             Time after which an infected node recovers and cannot be infected again.
         return_accessibility_matrix : Boolean, optional
@@ -1284,6 +1286,10 @@ class AdjMatrixSequence(list):
 
         Returns
         -------
+        cumu : list
+        a list containing the number of infected nodes for every timestep.
+        cumu_rec : list
+        a list containing the number of removed nodes for every timestep.
         
 
         """
@@ -1296,7 +1302,7 @@ class AdjMatrixSequence(list):
         empty = csr_matrix((self.number_of_nodes, self.number_of_nodes), dtype=np.int32)
         history = deque([empty for i in range(recovery)], maxlen=recovery)
         history.append(P)
-        recovered = empty
+        R = empty
         # save state
         cumu = [P.nnz]
         cumu_rec = [0]
@@ -1305,18 +1311,18 @@ class AdjMatrixSequence(list):
             # the si part
             P = P + P * csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape)
             # the ir part
-            recovered += history[0]
-            P -= P.multiply(recovered.astype("bool"))
+            R += history[0]
+            P -= P.multiply(R.astype("bool"))
             if P.nnz != P.count_nonzero():
                 print("err")
             history.append(P)
             # save state
             cumu.append(P.nnz)
-            cumu_rec.append(recovered.nnz)
+            cumu_rec.append(R.nnz)
 
 
         if return_accessibility_matrix:
-            P += recovered
+            P += R
             self.bool_int_matrix(P)
             P = P.astype('bool')
             P = P.astype('int')
@@ -1324,7 +1330,7 @@ class AdjMatrixSequence(list):
         else:
             return cumu, cumu_rec
 
-    def unfold_accessibility_sir_random_recovery(self, p_si=1, p_ir=0.01, return_accessibility_matrix = False):
+    def unfold_accessibility_sir_random_recovery(self, p_si=0.5, p_ir=0.01, return_accessibility_matrix = False):
 
         """
         Compute path density for all nodes. Infected nodes will recover spontaneosly with a given probability.
@@ -1332,14 +1338,20 @@ class AdjMatrixSequence(list):
 
         Parameters
         ----------
+        p_si : float, optional
+            probability of becoming infected from contact with an infected node. Default is 0.5.
         p_ir : float
-            Probability that a node recovers spontaneously. Should be between 0 and 1.
+            Probability that a node recovers spontaneously. Should be between 0 and 1. Default is 0.01.
         return_accessibility_matrix : Boolean, optional
             Returns the whole accessibility matrix. The matrix can be huge for
             large networks. The default is False.
 
         Returns
         -------
+        cumu : list
+        a list containing the number of infected nodes for every timestep.
+        cumu_rec : list
+        a list containing the number of removed nodes for every timestep.
         
 
         """
@@ -1349,24 +1361,24 @@ class AdjMatrixSequence(list):
         # the ir part
         P = D + D * csr_matrix((np.random.random_sample(self[0].data.shape)<p_si, self[0].indices, self[0].indptr), shape=self[0].shape)
         #the si part
-        recovered = P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
-        P -= P.multiply(recovered.astype("bool"))
+        R = P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
+        P -= P.multiply(R.astype("bool"))
         # save state
         cumu = [P.nnz]
-        cumu_rec = [recovered.nnz]
+        cumu_rec = [R.nnz]
 
         for t in range(1, len(self)):
             # the si part
             P = P + P * csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape)
             # the ir part
-            recovered += P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
-            P -= P.multiply(recovered.astype("bool"))
+            R += P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
+            P -= P.multiply(R.astype("bool"))
             # save state
             cumu.append(P.nnz)
-            cumu_rec.append(recovered.nnz)
+            cumu_rec.append(R.nnz)
 
         if return_accessibility_matrix:
-            P += recovered
+            P += R
             P = P.astype('bool')
             P = P.astype('int')
             return P, cumu, cumu_rec
@@ -1381,16 +1393,22 @@ class AdjMatrixSequence(list):
 
         Parameters
         ----------
+        p_si : float, optional
+            probability of becoming infected from contact with an infected node. Default is 0.5.
         recovery : int
             Time after which an infected node recovers and cannot be infected again.
         start_node : int, optional
-            First infected node.
+            First infected node. If None, a random node is chosen.
         return_accessibility_matrix : Boolean, optional
             Returns the whole accessibility matrix. The matrix can be huge for
             large networks. The default is False.
 
         Returns
         -------
+        cumu : list
+        a list containing the number of infected nodes for every timestep.
+        cumu_rec : list
+        a list containing the number of removed nodes for every timestep.
         
 
         """
@@ -1408,7 +1426,7 @@ class AdjMatrixSequence(list):
         # the ir part
         empty = csr_matrix((1, self.number_of_nodes), dtype=np.int32)
         history = deque([empty.copy() for i in range(recovery)], maxlen=recovery)
-        recovered = empty.copy()
+        R = empty.copy()
         #save state
         cumu = [x.nnz]
         cumu_rec = [0]
@@ -1417,14 +1435,14 @@ class AdjMatrixSequence(list):
             # the si part
             x = x + x * csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape)
             # the ir part
-            recovered += history[0]
-            x -= x.multiply(recovered.astype("bool"))
+            R += history[0]
+            x -= x.multiply(R.astype("bool"))
             if x.nnz != x.count_nonzero():
                 print("err")
             history.append(x)
             # save state
             cumu.append(x.nnz)
-            cumu_rec.append(recovered.nnz)
+            cumu_rec.append(R.nnz)
 
         return cumu, cumu_rec
     
@@ -1436,16 +1454,22 @@ class AdjMatrixSequence(list):
 
         Parameters
         ----------
+        p_si : float, optional
+            probability of becoming infected from contact with an infected node. Default is 0.5.
         p_ir : float
-            Probability that a node recovers spontaneously. Should be between 0 and 1.
-        start_node : int, oplional
-            First infected node.
+            Probability that a node recovers spontaneously. Should be between 0 and 1. Default is 0.01.
+        start_node : int, optional
+            First infected node. If None, a random node is chosen.
         return_accessibility_matrix : Boolean, optional
             Returns the whole accessibility matrix. The matrix can be huge for
             large networks. The default is False.
 
         Returns
         -------
+        cumu : list
+        a list containing the number of infected nodes for every timestep.
+        cumu_rec : list
+        a list containing the number of removed nodes for every timestep.
         
 
         """
@@ -1461,22 +1485,22 @@ class AdjMatrixSequence(list):
         # the si part
         x = x + x * csr_matrix((np.random.random_sample(self[0].data.shape)<p_si, self[0].indices, self[0].indptr), shape=self[0].shape)
         # the ir part
-        recovered = x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
-        x -= x.multiply(recovered.astype("bool"))
+        R = x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
+        x -= x.multiply(R.astype("bool"))
         # save state
         cumu = [x.nnz]
-        cumu_rec = [recovered.nnz]
+        cumu_rec = [R.nnz]
 
         
         for t in range(1, len(self)): 
             # the si part
             x = x + x * csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape)
             # the ir part
-            recovered += x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
-            x -= x.multiply(recovered.astype("bool"))
+            R += x.multiply(csr_matrix((np.random.random_sample(x.data.shape)<p_ir, x.indices, x.indptr), shape=x.shape))
+            x -= x.multiply(R.astype("bool"))
             # save state
             cumu.append(x.nnz)
-            cumu_rec.append(recovered.nnz)
+            cumu_rec.append(R.nnz)
 
         return cumu, cumu_rec
           
