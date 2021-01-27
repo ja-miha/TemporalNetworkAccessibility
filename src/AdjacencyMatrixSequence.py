@@ -158,6 +158,24 @@ class AdjMatrixSequence(list):
         for i, n in enumerate(nodes):
             old_to_new[n] = i
         return old_to_new
+    
+    def newindex(self, nodeids):
+        old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
+        old_to_new = {old : new for old, new in old_to_new_file}
+        if hasattr(nodeids, '__iter__'):
+            return [old_to_new[nodeid] for nodeid in nodeids]
+        else:
+            return old_to_new[nodeids]
+
+    def oldindex(self, nodeids):
+        old_to_new = open("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", "r")
+        if hasattr(nodeids, '__iter__'):
+            lines = old_to_new.readlines()
+            return [int(lines[nodeid].split()[0]) for nodeid in nodeids]
+        else:
+            for i, line in enumerate(old_to_new):
+                if i == nodeids:
+                    return int(line.split()[0])
 
     def all_time_windows(self, max_window=None):
         """Summation over all time windows."""
@@ -1132,76 +1150,20 @@ class AdjMatrixSequence(list):
 
         return arrival_times
 
-
-    def unfold_accessibility_with_tests(self, tests,
-                                            start_node=None,
-                                            start_time=0, stop_time = None,
-                                            stop_at_detection=True, p_false_negative = 0.5):
+    def add_tests(self, tests, reindex=True, test_columns=(0, 1)):
         """
-        Unfold the accessibility graph including tests.
-
-        The simulation stops, as soon as there is a positive test (or the end of time is reached). In order to simulate SI-like spreading the network
-        should be diluted.
+        Add tests to the AdjecencyMatrixSequence object. If there were already tests given, those are overwritten. Tests are needed for the unfold_accessibility_with_tests_better method.
 
         Parameters
         ----------
-        tests : dictionary
-            {time : [tested nodes]}, tested nodes should be reindexed
-        start_node : int, optional
-            index node of the epidemic. The default is None. If default is used
-            staring node is chosen at random.
-        start_time : int, optional
-            starting time for the epidemic. The default is 0.
-        stop_at_detection : Boolean, optional
-            If true, the epidemic is stopped, when it arrives at any sentonel
-            node. The default is False.
-        p_false_negative : float, optional
-            probability of a false negative test. The default is 0.5.
-
-        Returns
-        -------
-        tupel with (start_node, start_time, arrival_time, infected premises, detected(bool)).
-        arrival time will be start_time+stop_time if there is no detection
+        tests : str
+            file path of the tests file, file has two colums seperated by a tabulator, first column is the node id, second is day of the test.
+        reindex : bool, optional
+            Reindex the test nodes from the test file to match those of the network file. The default is True.
+        test columns : tuple, optional
+            If the file has more than two columns, indicate here witch columns to use.
 
         """
-        # raise error if sentinel node not in network
-        #if max(sentinels) >= self.number_of_nodes:
-            #raise ValueError("Sentinel node not in network.")
-
-        # set start_node for epidemic
-        if start_node or start_node == 0:
-            start = start_node
-        else:
-            start = np.random.randint(self.number_of_nodes)
-        #print("Starting epidemic at node ", start)
-
-        if not stop_time:
-            stop_time = len(self) - start_time
-            
-        # state array
-        x = sp.csr_matrix(([1], ([0], [start])),
-                          shape=(1, self.number_of_nodes), dtype=int)
-
-
-        for t in range(start_time, start_time+stop_time):
-            x = x + x * self[t]
-            if t in tests:
-                # tests array
-                row = np.zeros(len(tests[t]))
-                col = np.array(tests[t])
-                data = np.ones(len(tests[t]))
-                test_matrix = sp.csr_matrix((data, (row, col)),
-                                        shape=(1, self.number_of_nodes), dtype=int)
-                if (x.multiply(test_matrix)).nnz > 0:
-                    infected_tests = set((x.multiply(test_matrix) != 0)
-                                            .nonzero()[1])
-                    positive_tests = {s for s in infected_tests if random.random() > p_false_negative}
-                    if positive_tests: 
-                        return (start_node, start_time, t, x.nnz, 1), x.indices
-
-        return (start_node, start_time, start_time+stop_time, x.nnz, 0), x.indices
-
-    def add_tests(self, tests, reindex=True, test_columns=(0, 1)):
         if reindex and not self.label_file:
             raise ValueError('Label file needed for reindexing. Set write_label_file=True when initialising.')
         self.tests = list()
@@ -1211,13 +1173,12 @@ class AdjMatrixSequence(list):
     def unfold_accessibility_with_tests_better(self,
                                             start_node=None,
                                             start_time=0, stop_time = None,
-                                            stop_at_detection=True, p_false_negative = 0.5, p_si=1,
-                                            reindex=True):
+                                            p_false_negative = 0.5, p_si=1,
+                                            dereindex=True, reindex=False):
         """
         Unfold the accessibility graph including tests.
 
-        The simulation stops, as soon as there is a positive test (or the end of time is reached). In order to simulate SI-like spreading the network
-        should be diluted.
+        The simulation stops, as soon as there is a positive test (or the end of time is reached).
 
         Parameters
         ----------
@@ -1226,33 +1187,44 @@ class AdjMatrixSequence(list):
             staring node is chosen at random.
         start_time : int, optional
             starting time for the epidemic. The default is 0.
-        stop_at_detection : Boolean, optional
-            If true, the epidemic is stopped, when it arrives at any sentinel
-            node. The default is False.
+        stop_time : int, optional
+            After this timespan the simulation is stopped, even if there was no detection. The default is None.
         p_false_negative : float, optional
             probability of a false negative test. The default is 0.5.
+        p_si : float, optional
+            probability of becoming infected from contact with an infected node.
+        dereindex : bool, optional
+            Undo the reindexing of the nodes in the result. The default is True.
+        reindex : bool, optional
+            Reindex the start node. The default is False.
 
         Returns
         -------
-        tupel with (start_node, start_time, arrival_time, infected premises, detected(bool)).
-        arrival time will be start_time+stop_time if there is no detection
+        results : tupel
+            with (start_node, start_time, arrival_time, infected premises, detected(bool)).
+            arrival time will be start_time+stop_time if there is no detection
+        infected_nodes : list
+            list of all infected nodes
 
         """
 
+        #check if tests are included in the network
+        if not self.tests:
+            raise ValueError("There are no tests added to the Object. You can add tests upon initialisation or using the add_tests method")
+
         # set start_node for epidemic
         if start_node or start_node == 0:
-            start = start_node
+            if reindex:
+                if not self.label_file: raise ValueError('Label file needed for reindexing. Set write_label_file=True when initialising.')
+                start = self.newindex(start_node)
+            else:
+                start = start_node
         else:
             start = np.random.randint(self.number_of_nodes)
-        print("Starting epidemic at node ", start)
+        #print("Starting epidemic at node ", start)
 
-        if reindex:
-            if not self.label_file: raise ValueError('Label file needed for reindexing. Set write_label_file=True when initialising.')
-            # get dictionary of new indices
-            old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
-            re_dct = {new : old for old, new in old_to_new_file}
-            if start_node:
-                start = re_dct[start_node]
+        if dereindex:
+            if not self.label_file: raise ValueError('Label file needed for dereindexing. Set write_label_file=True when initialising.')
         
         if not stop_time:
             stop_time = len(self) - start_time
@@ -1263,19 +1235,21 @@ class AdjMatrixSequence(list):
 
 
         for t in range(start_time, start_time+stop_time):
-            #x = x + x * self[t]
-            x = x + x * self[t].multiply(csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape))
+            # new infections
+            x = x + x * csr_matrix((np.random.random_sample(self[t].data.shape)<p_si, self[t].indices, self[t].indptr), shape=self[t].shape)
+            # tests
             if (x.multiply(self.tests[t])).nnz > 0:
-                infected_tests = set((x.multiply(self.tests[t]) != 0)
-                                        .nonzero()[1])
-                positive_tests = {s for s in infected_tests if random.random() > p_false_negative}
-                if positive_tests: 
-                    if reindex:
-                        return (re_dct[start_node], start_time, t, x.nnz, 1), [re_dct[i] for i in x.indices]
-                    else:
-                        return (start_node, start_time, t, x.nnz, 1), x.indices
-        if reindex:
-            return (re_dct[start_node], start_time, start_time+stop_time, x.nnz, 1), [re_dct[i] for i in x.indices]
+                infected_tests = (x.multiply(self.tests[t]) != 0).nonzero()[1]
+                for n in infected_tests:
+                    if random.random() > p_false_negative:
+                        # return because detected
+                        if dereindex:
+                            return (self.oldindex(start_node), start_time, t, x.nnz, 1), self.oldindex(x.indices)
+                        else:
+                            return (start_node, start_time, t, x.nnz, 1), x.indices
+        # return because stop_time reached
+        if dereindex:
+            return (self.oldindex(start_node), start_time, start_time+stop_time, x.nnz, 0), self.oldindex(x.indices)
         else:
             return (start_node, start_time, start_time+stop_time, x.nnz, 0), x.indices
 
