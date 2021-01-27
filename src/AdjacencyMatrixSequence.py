@@ -1313,8 +1313,6 @@ class AdjMatrixSequence(list):
             # the ir part
             R += history[0]
             P -= P.multiply(R.astype("bool"))
-            if P.nnz != P.count_nonzero():
-                print("err")
             history.append(P)
             # save state
             cumu.append(P.nnz)
@@ -1437,8 +1435,6 @@ class AdjMatrixSequence(list):
             # the ir part
             R += history[0]
             x -= x.multiply(R.astype("bool"))
-            if x.nnz != x.count_nonzero():
-                print("err")
             history.append(x)
             # save state
             cumu.append(x.nnz)
