@@ -12,8 +12,9 @@ p_si = 0.5
 p_false_neg = 0.1
 start_timespan = 4*365 - 30
 expert_detection = 30
-n_runs = 10
+n_runs = 1000
 n_nets = 100
+first_slaughterhouse_id = 8800 # to exclude slaughterhouses from start nodes. it is assumed the node ids are ordered by type, with slaughterhouses coming last
 
 sen_filenames = ["random_sentil", "degree_sentil", "betw_sentil", "kshel_sentil"]
 timepoints_path = "Synset/timepoint_13oct.txt"
@@ -30,7 +31,7 @@ rank = rank + (n_array-1) * 8 # n_tasks
 
 if rank < n_nets:
     network_path = network_pattern % rank
-    si_model = AdjMatrixSequence(network_path, directed= True, write_label_file=True, mpi_rank=rank)
+    si_model = AdjMatrixSequence(network_path, directed= True, write_label_file=True, rank=rank)
     for sen_filename in sen_filenames:
         sentinel_path = sentinel_pattern % (rank, sen_filename)
 
@@ -41,11 +42,11 @@ if rank < n_nets:
         testfile = generate_tests(sentinel_path, timepoints_path, rank)
 
         # generate AdjMatrixSequence Object
-        #si_model = AdjMatrixSequence(network_path, directed= True, tests=testfile, mpi_rank=rank)#create Adjecency Matrix Object
+        #si_model = AdjMatrixSequence(network_path, directed= True, tests=testfile, rank=rank)#create Adjecency Matrix Object
         si_model.add_tests(testfile)
 
         # choose start nodes randomly
-        mx = si_model.newindex(8800)
+        mx = si_model.newindex(first_slaughterhouse_id)
         starts = rn.sample(range(mx), n_runs)
 
 

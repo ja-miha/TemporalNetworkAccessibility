@@ -42,7 +42,7 @@ class AdjMatrixSequence(list):
     """
 
     def __init__(self, edgelist_fname, directed, write_label_file=False,
-                 columns=(0, 1, 2), firsttime=None, lasttime=None, tests=None, mpi_rank=0):
+                 columns=(0, 1, 2), firsttime=None, lasttime=None, tests=None, rank=""):
         list.__init__(self)
         self.first_day = firsttime
         self.last_day = lasttime
@@ -51,13 +51,15 @@ class AdjMatrixSequence(list):
         self.label_file = write_label_file
         if tests: self.label_file = True
         self.is_directed = directed
-        self.mpi_rank = mpi_rank
+        self.rank = rank
 
         self.create_matrices()
         if not self.is_directed:
             self.as_undirected()
         self.number_of_nodes = np.shape(self[0])[0]
-        if tests: self.add_tests(tests)
+        if tests:
+            self.tests = list()
+            self.add_tests(tests)
         self.check_py_version()
 
     def check_py_version(self):
@@ -166,7 +168,7 @@ class AdjMatrixSequence(list):
         attention: has to load the whole file of node indexes every time it's called.
 
         """
-        old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
+        old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.rank)+".txt", dtype=int, delimiter="\t").tolist()
         old_to_new = {old : new for old, new in old_to_new_file}
         if hasattr(nodeids, '__iter__'):
             return [old_to_new[nodeid] for nodeid in nodeids]
@@ -180,7 +182,7 @@ class AdjMatrixSequence(list):
         attention: has to load the whole file of node indexes every time it's called.
 
         """
-        old_to_new = open("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", "r")
+        old_to_new = open("oldindex_matrixfriendly"+str(self.rank)+".txt", "r")
         if hasattr(nodeids, '__iter__'):
             lines = old_to_new.readlines()
             return [int(lines[nodeid].split()[0]) for nodeid in nodeids]
@@ -891,7 +893,7 @@ class AdjMatrixSequence(list):
         # get dictionary of new indices and write map-file
         re_dct = self.reindex(edges)
         if self.label_file:
-            g = open('oldindex_matrixfriendly'+str(self.mpi_rank)+'.txt', 'w+')
+            g = open('oldindex_matrixfriendly'+str(self.rank)+'.txt', 'w+')
             for k in re_dct:
                 g.writelines((str(k) + '\t' + str(re_dct[k]) + '\n'))
             g.close()
@@ -928,7 +930,7 @@ class AdjMatrixSequence(list):
 
         if reidx:
             # get dictionary of new indices
-            old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.mpi_rank)+".txt", dtype=int, delimiter="\t").tolist()
+            old_to_new_file = np.genfromtxt("oldindex_matrixfriendly"+str(self.rank)+".txt", dtype=int, delimiter="\t").tolist()
             re_dct = {old : new for old, new in old_to_new_file}
 
             # reindex using this dictionary
@@ -1356,9 +1358,9 @@ class AdjMatrixSequence(list):
 
         P = self[0].copy()
         D = sp.identity(self.number_of_nodes, dtype=np.int32)
-        # the ir part
+        # the si part
         P = D + D * csr_matrix((np.random.random_sample(self[0].data.shape)<p_si, self[0].indices, self[0].indptr), shape=self[0].shape)
-        #the si part
+        #the ir part
         R = P.multiply(csr_matrix((np.random.random_sample(P.data.shape)<p_ir, P.indices, P.indptr), shape=P.shape))
         P -= P.multiply(R.astype("bool"))
         # save state
