@@ -12,13 +12,13 @@ p_si = 0.5
 p_false_neg = 0.1
 start_timespan = 4*365 - 30
 expert_detection = 30
-n_runs = 10
+n_runs = 10000
 
 
-sen_filenames = ["random", "degree", "kshel", "closeness"]#["random", "degree", "betweenness", "kshel", "closeness"]
-timepoints_path = "/Users/jakob/Documents/OPTES/Generate sentinels/timepoints_pigtrade.txt"#"timepoints_pigtrade.txt"
-network_path = "edgelists/pig_trade_2011-2014_temporalnetwork.csv"#"data/pig_trade_2011-2014_temporalnetwork.csv"
-sentinel_pattern = "/Users/jakob/Documents/OPTES/Generate sentinels/%s_sentil_pigtrade.txt"
+sen_filenames = ["random", "degree", "betweenness", "kshel", "closeness"]
+timepoints_path = "pigtrade/timepoints_pigtrade.txt"
+network_path = "pigtrade/pig_trade_2011-2014_temporalnetwork.csv"
+sentinel_pattern = "pigtrade/%s_sentil_pigtrade.txt"
 
 #n_array = int(sys.argv[1])
 

@@ -20,5 +20,14 @@
 
 import os
 
+src = "SDTC_based11M21/SDTC_sentil%i.txt"
+dst = "Synset9Mar21/syndata%i/SDTC_sentil.txt"
+
 for i in range(100):
-    os.rename("randomplacement/random_sentil"+str(i)+".txt", "Synset/syndata"+str(i)+"/random_sentil.txt")
+    os.rename(src % i, dst % i)
+
+src = "SDDC_based11M21/SDDC_sentil%i.txt"
+dst = "Synset9Mar21/syndata%i/SDDC_sentil.txt"
+
+for i in range(100):
+    os.rename(src % i, dst % i)

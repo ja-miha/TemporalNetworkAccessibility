@@ -50,6 +50,8 @@ src/oldindex_matrixfriendly.txt
 
 /Synset
 
+/Synset9Mar21
+
 test*
 
 prepare_input.ipynb
@@ -58,4 +60,6 @@ pig_trade_2011-2014_temporalnetwork.csv
 
 .vscode
 
+SDDC_based11M21
+SDTC_based11M21
 

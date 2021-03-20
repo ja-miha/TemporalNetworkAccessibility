@@ -14,18 +14,19 @@ def node_type(nodeid):
 
 def generate_tests(nodefile, timefile, mpi_rank=0):
     sentinels_old_index = np.genfromtxt(nodefile, dtype = int, delimiter = ",").tolist()
+    if sentinels_old_index[-1]==-1: sentinels_old_index.pop()
     timepoints = np.genfromtxt(timefile, delimiter = ",", dtype=int).tolist()
     better_tests = []
     for i in range(len(timepoints)):
         for j in timepoints[i]:
-            better_tests.append((int(sentinels_old_index[i]), int(j)))
+            better_tests.append((sentinels_old_index[i], j))
     better_tests = np.array(better_tests)
     path = "tests%i.txt" % mpi_rank
     np.savetxt(path, better_tests, delimiter="\t", fmt="%i")#, sep="\t")
     return path
 
-def format_results(results, barn_lists, filename, mpi_rank):
-    barn_sizes = np.genfromtxt("Synset/syndata%i/barn_size.txt" % (mpi_rank), dtype=int, delimiter=",").tolist()
+def format_results(results, barn_lists, sizefile, filename):
+    barn_sizes = np.genfromtxt(sizefile, dtype=int, delimiter=",").tolist()
     infected_capacity = [sum([barn_sizes[element] for element in ls]) for ls in barn_lists]
     df = pd.DataFrame(results, columns = ["start_node", "start_day", "detection_day", "n_infected", "detected"], dtype=int)
     df["start_type"] = df["start_node"].transform(node_type)

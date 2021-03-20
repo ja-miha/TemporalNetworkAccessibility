@@ -16,10 +16,11 @@ n_runs = 1000
 n_nets = 100
 first_slaughterhouse_id = 8800 # to exclude slaughterhouses from start nodes. it is assumed the node ids are ordered by type, with slaughterhouses coming last
 
-sen_filenames = ["random_sentil", "degree_sentil", "betw_sentil", "kshel_sentil"]
-timepoints_path = "Synset/timepoint_13oct.txt"
-network_pattern = "Synset/syndata%i/dataset.txt"
-sentinel_pattern = "Synset/syndata%i/%s.txt"
+sen_filenames = ["random", "degree", "betw", "kshel", "SDTC", "SDDC"]
+timepoints_path = "Synset9Mar21/timepoints_17Mar21.txt"
+network_pattern = "Synset9Mar21/syndata%i/dataset.txt"
+sentinel_pattern = "Synset9Mar21/syndata%i/%s_sentil.txt"
+barnsize_pattern = "Synset9Mar21/syndata%i/barn_size.txt"
 
 n_array = int(sys.argv[1])
 
@@ -58,6 +59,6 @@ if rank < n_nets:
             results.append(result)
             barn_lists.append(infected_barns)
 
-        format_results(results, barn_lists, "results/"+sen_filename+"_results_timepoint_13oct_"+str(rank)+".txt", rank)
+        format_results(results, barn_lists, barnsize_pattern % rank, "results/"+"results_9Mar21_"+sen_filename+"_"+str(rank)+".txt")
 
         print(time.time()-start_time)
