@@ -17,7 +17,7 @@ def generate_tests(nodefile, timefile, mpi_rank=0):
     if sentinels_old_index[-1]==-1: sentinels_old_index.pop()
     timepoints = np.genfromtxt(timefile, delimiter = ",", dtype=int).tolist()
     better_tests = []
-    for i in range(len(timepoints)):
+    for i in range(len(sentinels_old_index)):
         for j in timepoints[i]:
             better_tests.append((sentinels_old_index[i], j))
     better_tests = np.array(better_tests)
@@ -33,3 +33,16 @@ def format_results(results, barn_lists, sizefile, filename):
     df["infected_capacity"] = np.array(infected_capacity)
     df.to_csv(filename, index=False)
     return(df)
+
+def generate_tests_onesent(nodefile, timefile, mpi_rank=0):
+    sentinels_old_index = np.genfromtxt(nodefile, dtype = int, delimiter = ",").tolist()
+    if sentinels_old_index[-1]==-1: sentinels_old_index.pop()
+    timepoints = np.genfromtxt(timefile, delimiter = ",", dtype=int).tolist()
+    better_tests = []
+    for i in range(1):
+        for j in timepoints[i]:
+            better_tests.append((sentinels_old_index[i], j))
+    better_tests = np.array(better_tests)
+    path = "tests%i.txt" % mpi_rank
+    np.savetxt(path, better_tests, delimiter="\t", fmt="%i")#, sep="\t")
+    return path

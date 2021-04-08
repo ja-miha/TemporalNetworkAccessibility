@@ -939,7 +939,7 @@ class AdjMatrixSequence(list):
         testpoints = self.groupByTime_tests(testpoints)
 
         # the actual construction of the sparse matrices
-        mx_index = len(re_dct)
+        mx_index = self.number_of_nodes
         for d, us in testpoints:
             vs = [0 for i in range(len(us))]
             bs = [True for i in range(len(us))]
